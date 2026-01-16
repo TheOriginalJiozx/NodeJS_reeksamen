@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BookingSystem</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+      try {
+        if (typeof Node !== 'undefined') {
+          const desc = Object.getOwnPropertyDescriptor(Node.prototype, 'firstChild');
+          if (!desc) {
+            Object.defineProperty(Node.prototype, 'firstChild', {
+              get() { return this.childNodes && this.childNodes[0] || null; },
+              configurable: true
+            });
+          }
+        }
+      } catch (error) {
+        logger.error('Error applying Node.firstChild polyfill:', error);
+      }
+    </script>
+  </body>
+</html>
