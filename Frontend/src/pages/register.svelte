@@ -1,11 +1,21 @@
 <script>
   import { toast } from '../store/toastStore.js';
-  
+  import { onMount } from 'svelte';
+  import user from '../store/userStore.js';
+  import { navigate, route } from '../lib/router.js';
+
   let name = '';
   let email = '';
   let password = '';
   let confirm = '';
   let message = '';
+
+  onMount(() => {
+    if ($user) {
+      navigate('/profile');
+      route.set('/profile');
+    }
+  });
 
   async function submit(event) {
     event.preventDefault();

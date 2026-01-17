@@ -11,8 +11,19 @@ const DB_PORT = process.env.MYSQL_PORT ? Number(process.env.MYSQL_PORT) : 3306;
 let pool;
 
 try {
-    pool = mysql.createPool({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME, port: DB_PORT, waitForConnections: true, connectionLimit: 10 });
-    pool.getConnection().then(conn => { conn.release(); logger.info('Connected to MySQL'); }).catch(error => logger.warn('MySQL connection warning:', error.message));
+    pool = mysql.createPool({
+        host: DB_HOST,
+        user: DB_USER,
+        password: DB_PASSWORD,
+        database: DB_NAME,
+        port: DB_PORT,
+        waitForConnections: true,
+        connectionLimit: 10
+    });
+    pool.getConnection().then(connection => {
+        connection.release();
+        logger.info('Connected to MySQL');
+    }).catch(error => logger.warn('MySQL connection warning:', error.message));
 } catch (error) {
     logger.warn('MySQL pool creation failed, will use stub:', error.message);
     pool = null;
@@ -28,8 +39,8 @@ async function query(text, params = []) {
         return { rowCount: 0, rows: [] };
     }
 
-    const sql = convertQuery(text);
-    const [rows] = await pool.execute(sql, params);
+    const sqlQuery = convertQuery(text);
+    const [rows] = await pool.query(sqlQuery, params);
 
     if (Array.isArray(rows)) {
         return { rowCount: rows.length, rows };

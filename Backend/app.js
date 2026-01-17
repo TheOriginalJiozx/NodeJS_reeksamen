@@ -11,6 +11,7 @@ import bookingRoutes from './routers/bookings/bookingRoutes.js';
 import resourceRoutes from './routers/resources/resourceRoutes.js';
 import typesRoutes from './routers/types/typesRoutes.js';
 import uploadRoutes from './routers/uploads/uploadRoutes.js';
+import authMiddleware from './middleware/authMiddleware.js';
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
 
@@ -26,6 +27,7 @@ const sessionOptions = {
 
 const MySQLStore = expressMySQLSession(session);
 const sessionStore = new MySQLStore(sessionOptions);
+global.sessionStore = sessionStore;
 
 app.use(express.json())
 

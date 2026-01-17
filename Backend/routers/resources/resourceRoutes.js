@@ -2,6 +2,8 @@ import { Router } from 'express';
 import db from '../../db/connection.js';
 import { isLoggedIn } from '../../middleware/authMiddleware.js';
 import logger from '../../lib/logger.js';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 
@@ -143,6 +145,14 @@ router.delete('/api/resources/:id', isLoggedIn, async (req, res) => {
     const username = req.user && req.user.username ? req.user.username : null;
     if (resourceOwner !== username) return res.status(403).json({ message: 'Forbidden: you are not the owner of this resource' });
 
+    let resourceImage = null;
+    try {
+      const imagesRes = await db.query('SELECT image FROM resources WHERE id = $1', [id]);
+      if (imagesRes.rowCount && imagesRes.rows[0] && imagesRes.rows[0].image) resourceImage = imagesRes.rows[0].image;
+    } catch (error) {
+      logger.debug('Could not fetch resource image', error && error.message ? error.message : error);
+    }
+
     try {
       await db.query('DELETE FROM bookings WHERE resource_id = $1', [id]);
     } catch (error) {
@@ -155,6 +165,19 @@ router.delete('/api/resources/:id', isLoggedIn, async (req, res) => {
     }
 
     await db.query('DELETE FROM resources WHERE id = $1', [id]);
+
+    if (resourceImage && String(resourceImage).includes('/uploads/')) {
+      try {
+        const parts = String(resourceImage).split('/uploads/');
+        const filename = parts[1] || parts[parts.length - 1];
+        const uploadPath = path.resolve('./Frontend/public/uploads', filename);
+        fs.unlink(uploadPath, (error) => {
+          if (error) logger.debug('Failed to delete resource image file', error && error.message ? error.message : error);
+        });
+      } catch (error) {
+        logger.debug('Error deleting resource image file', error && error.message ? error.message : error);
+      }
+    }
 
     try {
       if (global.io) global.io.emit('resource:deleted', { id });

@@ -8,7 +8,7 @@
       </div>
     </div>
     <div class="mt-6 md:mt-0">
-      <img src="https://images.unsplash.com/photo-1557800636-894a64c1696f?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.0.3&s=placeholder" alt="Meeting" class="w-full max-w-sm rounded">
+      <img src="/uploads/car-rental.jpg" alt="Meeting" class="w-full max-w-sm rounded">
     </div>
   </div>
 
