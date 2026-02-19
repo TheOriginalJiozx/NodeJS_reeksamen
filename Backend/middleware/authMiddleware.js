@@ -1,4 +1,4 @@
-import logger from '../lib/logger.js';
+import logger from "../lib/logger.js";
 
 export function isLoggedIn(req, res, next) {
   try {
@@ -7,10 +7,10 @@ export function isLoggedIn(req, res, next) {
       return next();
     }
 
-    return res.status(401).json({ message: 'Not authenticated' });
+    return res.status(401).json({ message: "Not authenticated" });
   } catch (error) {
-    logger.error(error, 'isLoggedIn middleware error');
-    return res.status(500).json({ message: 'Internal server error' });
+    logger.error(error, "isLoggedIn middleware error");
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 

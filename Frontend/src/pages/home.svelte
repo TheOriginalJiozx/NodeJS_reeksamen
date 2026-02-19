@@ -4,11 +4,13 @@
       <h2 class="text-3xl font-bold mb-2">Welcome to the booking system</h2>
       <p class="text-gray-700 mb-4">Book meeting rooms and company cars easily.</p>
       <div class="flex gap-3">
-        <a href="/booking?type=room" class="bg-blue-600 text-white px-4 py-2 rounded shadow">Book meeting room or a car</a>
+        <a href="/booking?type=room" class="bg-blue-600 text-white px-4 py-2 rounded shadow"
+          >Book meeting room or a car</a
+        >
       </div>
     </div>
     <div class="mt-6 md:mt-0">
-      <img src="/uploads/car-rental.jpg" alt="Meeting" class="w-full max-w-sm rounded">
+      <img src="/uploads/car-rental.jpg" alt="Meeting" class="w-full max-w-sm rounded" />
     </div>
   </div>
 

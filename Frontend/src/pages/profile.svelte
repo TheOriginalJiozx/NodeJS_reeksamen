@@ -4,6 +4,7 @@
   import { toast } from "../store/toastStore.js";
   import { clearUser } from "../store/userStore.js";
   import logger from "../lib/logger.js";
+  import apiFetch from "../lib/api.js";
 
   let user = null;
   let loading = true;
@@ -26,10 +27,8 @@
         deleting = false;
         return;
       }
-      const res = await fetch(`/api/users/${targetId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+
+      const res = await apiFetch(`/api/users/${targetId}`, { method: "DELETE" });
       const content = res.headers.get("content-type") || "";
       let data = {};
       if (content.includes("application/json")) data = await res.json();
@@ -53,10 +52,7 @@
       }
 
       if (res.status === 409) {
-        toast(
-          data.message || "Cannot delete account while active bookings exist",
-          "error",
-        );
+        toast(data.message || "Cannot delete account while active bookings exist", "error");
       } else {
         toast(data.message || "Failed to delete account", "error");
       }
@@ -71,16 +67,17 @@
     if (!confirm("Export your data to a JSON file?")) return;
     exporting = true;
     try {
-      const res = await fetch("/api/users/export", {
-        method: "POST",
-        credentials: "include",
-      });
+      const apiFetch = (await import("../lib/api.js")).default;
+      const res = await apiFetch("/api/users/export", { method: "POST" });
       if (!res.ok) {
         let error = {};
         try {
           error = await res.json();
         } catch (error) {
-            logger.error("Failed to parse export error response", error && error.message ? error.message : error);
+          logger.error(
+            "Failed to parse export error response",
+            error && error.message ? error.message : error,
+          );
         }
         toast(error.message || "Export failed", "error");
         return;

@@ -1,46 +1,47 @@
 <script>
-  import { toast } from '../store/toastStore.js';
-  import { onMount } from 'svelte';
-  import user from '../store/userStore.js';
-  import { navigate, route } from '../lib/router.js';
+  import { toast } from "../store/toastStore.js";
+  import { onMount } from "svelte";
+  import user from "../store/userStore.js";
+  import { navigate, route } from "../lib/router.js";
+  import apiFetch from "../lib/api.js";
 
-  let name = '';
-  let email = '';
-  let password = '';
-  let confirm = '';
-  let message = '';
+  let name = "";
+  let email = "";
+  let password = "";
+  let confirm = "";
+  let message = "";
 
   onMount(() => {
     if ($user) {
-      navigate('/profile');
-      route.set('/profile');
+      navigate("/profile");
+      route.set("/profile");
     }
   });
 
   async function submit(event) {
     event.preventDefault();
     if (!name || !email || !password) {
-      message = 'Please fill in all fields.';
-      return;
-    }
-    if (password !== confirm) {
-      message = 'Passwords do not match.';
+      message = "Please fill in all fields.";
       return;
     }
 
-    message = 'Creating account...';
+    if (password !== confirm) {
+      message = "Passwords do not match.";
+      return;
+    }
+
+    message = "Creating account...";
 
     try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username: name, email, password })
+      const res = await apiFetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: name, email, password }),
       });
 
       let data = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
         data = await res.json();
       } else {
         const text = await res.text();
@@ -48,20 +49,20 @@
       }
 
       if (!res.ok) {
-        message = data && data.message ? data.message : 'Registration failed';
-        toast(message, 'error');
+        message = data && data.message ? data.message : "Registration failed";
+        toast(message, "error");
         return;
       }
 
-      message = data.message || 'Account created';
-      toast(message, 'success');
-      name = '';
-      email = '';
-      password = '';
-      confirm = '';
+      message = data.message || "Account created";
+      toast(message, "success");
+      name = "";
+      email = "";
+      password = "";
+      confirm = "";
     } catch (error) {
-      message = 'Network error. Please try again.';
-      toast(message, 'error');
+      message = "Network error. Please try again.";
+      toast(message, "error");
     }
   }
 </script>
@@ -82,11 +83,21 @@
     </div>
     <div>
       <label for="password" class="block text-sm mb-1">Password</label>
-      <input id="password" type="password" class="w-full border rounded px-3 py-2" bind:value={password} />
+      <input
+        id="password"
+        type="password"
+        class="w-full border rounded px-3 py-2"
+        bind:value={password}
+      />
     </div>
     <div>
       <label for="confirm" class="block text-sm mb-1">Confirm password</label>
-      <input id="confirm" type="password" class="w-full border rounded px-3 py-2" bind:value={confirm} />
+      <input
+        id="confirm"
+        type="password"
+        class="w-full border rounded px-3 py-2"
+        bind:value={confirm}
+      />
     </div>
     <div>
       <button class="bg-blue-600 text-white px-4 py-2 rounded">Create account</button>

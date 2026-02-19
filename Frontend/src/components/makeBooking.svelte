@@ -2,16 +2,14 @@
   import { onMount, onDestroy } from "svelte";
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
-  import {
-    fetchAllResources,
-    fetchAvailability,
-  } from "../fetcher/bookingFetchers.js";
+  import { fetchAllResources, fetchAvailability } from "../fetcher/bookingFetchers.js";
   import { handleBooking } from "../handler/bookingHandlers.js";
   import { toast } from "../store/toastStore.js";
   import { today, contiguousEndDates } from "../util/bookingUtils.js";
   import logger from "../lib/logger.js";
 
   let resourcesAll = [];
+
   let booking = {
     resourceId: "",
     startDate: "",
@@ -19,6 +17,7 @@
     booker: "",
     comment: "",
   };
+
   let availableDates = [];
 
   $: selectedResource = resourcesAll.find(
@@ -54,15 +53,17 @@
       try {
         endFlatPickr.clear();
       } catch (error) {
-        logger.error("Failed to clear end date picker", error && error.message ? error.message : error);
+        logger.error(
+          "Failed to clear end date picker",
+          error && error.message ? error.message : error,
+        );
       }
     }
   }
 
   onMount(async () => {
     resourcesAll = (await fetchAllResources()).resourcesAll || [];
-    if (resourcesAll.length && !booking.resourceId)
-      booking.resourceId = resourcesAll[0].id;
+    if (resourcesAll.length && !booking.resourceId) booking.resourceId = resourcesAll[0].id;
     if (booking.resourceId) await load(booking.resourceId);
 
     startFlatPickr = flatpickr(startElement, {
@@ -124,15 +125,10 @@
           type="button"
           class="bg-gray-200 text-gray-800 px-3 py-1 rounded"
           aria-label="Preview image"
-          on:click={() =>
-            window.open(selectedResource.image, "_blank", "noopener")}
+          on:click={() => window.open(selectedResource.image, "_blank", "noopener")}
           >Preview image</button
         >
-        <img
-          src={selectedResource.image}
-          alt={selectedResource.name}
-          class="h-12 rounded border"
-        />
+        <img src={selectedResource.image} alt={selectedResource.name} class="h-12 rounded border" />
       </div>
     {/if}
     <div class="grid grid-cols-2 gap-2">
@@ -151,14 +147,7 @@
         placeholder="End date"
       />
     </div>
-    <input
-      class="w-full border rounded p-2"
-      placeholder="Comment"
-      bind:value={booking.comment}
-    />
-    <button
-      class="bg-blue-600 text-white px-4 py-2 rounded"
-      on:click|preventDefault={book}>Book</button
-    >
+    <input class="w-full border rounded p-2" placeholder="Comment" bind:value={booking.comment} />
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" on:click|preventDefault={book}>Book</button>
   </div>
 </section>

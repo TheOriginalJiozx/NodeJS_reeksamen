@@ -2,15 +2,12 @@
   import { onMount, onDestroy } from "svelte";
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
-  import {
-    fetchOwnedResources,
-    fetchAvailability,
-  } from "../fetcher/bookingFetchers.js";
+  import { fetchOwnedResources, fetchAvailability } from "../fetcher/bookingFetchers.js";
   import { handleAddAvailability } from "../handler/bookingHandlers.js";
   import { toast } from "../store/toastStore.js";
   import { today, contiguousEndDates } from "../util/bookingUtils.js";
   import logger from "../lib/logger.js";
-  
+
   let resourcesOwned = [];
   let available = { resourceId: "", startDate: "", endDate: "" };
   let availability = [];
@@ -63,15 +60,17 @@
       try {
         endFlatPickr.clear();
       } catch (error) {
-        logger.error("Failed to clear end date picker", error && error.message ? error.message : error);
+        logger.error(
+          "Failed to clear end date picker",
+          error && error.message ? error.message : error,
+        );
       }
     }
   }
 
   onMount(async () => {
     resourcesOwned = await fetchOwnedResources();
-    if (resourcesOwned.length && !available.resourceId)
-      available.resourceId = resourcesOwned[0].id;
+    if (resourcesOwned.length && !available.resourceId) available.resourceId = resourcesOwned[0].id;
     if (available.resourceId) await load(available.resourceId);
 
     startFlatPickr = flatpickr(startElement, {
@@ -80,6 +79,7 @@
       minDate: today,
       onChange: (selectedDates, dateString) => (available.startDate = dateString || ""),
     });
+
     endFlatPickr = flatpickr(endElement, {
       dateFormat: "Y-m-d",
       enable: availableEndOptions,
@@ -100,6 +100,7 @@
       toast("Select both start and end dates", "error");
       return;
     }
+
     const res = await handleAddAvailability(available);
     if (res && res.ok) {
       toast("Availability added", "success");
@@ -138,9 +139,8 @@
         placeholder="End date"
       />
     </div>
-    <button
-      class="bg-green-600 text-white px-4 py-2 rounded"
-      on:click|preventDefault={add}>Add</button
+    <button class="bg-green-600 text-white px-4 py-2 rounded" on:click|preventDefault={add}
+      >Add</button
     >
   </div>
 </section>

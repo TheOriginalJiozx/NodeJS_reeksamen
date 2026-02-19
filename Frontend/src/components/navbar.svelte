@@ -1,8 +1,9 @@
 <script>
-  import { onMount } from 'svelte';
-  import { navigate } from '../lib/router.js';
-  import user, { bootstrap, clearUser } from '../store/userStore.js';
-  import { toast } from '../store/toastStore.js';
+  import { onMount } from "svelte";
+  import { navigate } from "../lib/router.js";
+  import user, { bootstrap, clearUser } from "../store/userStore.js";
+  import { toast } from "../store/toastStore.js";
+  import apiFetch from "../lib/api.js";
 
   onMount(() => {
     bootstrap();
@@ -11,12 +12,12 @@
   async function handleLogout(event) {
     event.preventDefault();
     try {
-      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      await apiFetch("/api/logout", { method: "POST" });
     } catch (error) {
-      toast(error && error.message ? error.message : 'Network error', 'error');
+      toast(error && error.message ? error.message : "Network error", "error");
     }
     clearUser();
-    navigate('/login');
+    navigate("/login");
   }
 </script>
 
@@ -28,7 +29,11 @@
       {#if $user}
         <a href="/profile" class="text-white/90 hover:text-white">Profile</a>
         <a href="/booking" class="text-white/90 hover:text-white">Book</a>
-        <button type="button" on:click={handleLogout} class="bg-red-600 text-white px-4 py-2 rounded">Logout</button>
+        <button
+          type="button"
+          on:click={handleLogout}
+          class="bg-red-600 text-white px-4 py-2 rounded">Logout</button
+        >
       {:else}
         <a href="/register" class="text-white/90 hover:text-white">Register</a>
         <a href="/login" class="text-white/90 hover:text-white">Login</a>

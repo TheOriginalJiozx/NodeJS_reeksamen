@@ -1,41 +1,41 @@
 <script>
-  import { onMount } from 'svelte';
-  import user from '../store/userStore.js';
-  import { navigate, route } from '../lib/router.js';
-  import { toast } from '../store/toastStore.js';
-  import { setUser } from '../store/userStore.js';
-  
-  let username = '';
-  let password = '';
-  let message = '';
+  import { onMount } from "svelte";
+  import user from "../store/userStore.js";
+  import { navigate, route } from "../lib/router.js";
+  import { toast } from "../store/toastStore.js";
+  import { setUser } from "../store/userStore.js";
+  import apiFetch from "../lib/api.js";
+
+  let username = "";
+  let password = "";
+  let message = "";
 
   onMount(() => {
     if ($user) {
-      navigate('/profile');
-      route.set('/profile');
+      navigate("/profile");
+      route.set("/profile");
     }
   });
 
   async function submit(event) {
     event.preventDefault();
     if (!username || !password) {
-      message = 'Please enter username and password.';
+      message = "Please enter username and password.";
       return;
     }
 
-    message = 'Logging in...';
+    message = "Logging in...";
 
     try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, password })
+      const res = await apiFetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
       });
 
       let data = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
         data = await res.json();
       } else {
         const text = await res.text();
@@ -43,20 +43,20 @@
       }
 
       if (!res.ok) {
-        message = data && data.message ? data.message : 'Login failed';
+        message = data && data.message ? data.message : "Login failed";
         return;
       }
 
-      message = data.message || 'Login successful';
-      toast('Successfully logged in', 'success');
+      message = data.message || "Login successful";
+      toast("Successfully logged in", "success");
       if (data.user) setUser(data.user);
-      username = '';
-      password = '';
-      navigate('/profile');
-      route.set('/profile');
+      username = "";
+      password = "";
+      navigate("/profile");
+      route.set("/profile");
     } catch (error) {
-      message = 'Network error. Please try again.';
-      toast(error && error.message ? error.message : 'Network error', 'error');
+      message = "Network error. Please try again.";
+      toast(error && error.message ? error.message : "Network error", "error");
     }
   }
 </script>
@@ -69,11 +69,21 @@
   <form on:submit={submit} class="space-y-4">
     <div>
       <label for="login-username" class="block text-sm mb-1">Username</label>
-      <input id="login-username" type="text" class="w-full border rounded px-3 py-2" bind:value={username} />
+      <input
+        id="login-username"
+        type="text"
+        class="w-full border rounded px-3 py-2"
+        bind:value={username}
+      />
     </div>
     <div>
       <label for="login-password" class="block text-sm mb-1">Password</label>
-      <input id="login-password" type="password" class="w-full border rounded px-3 py-2" bind:value={password} />
+      <input
+        id="login-password"
+        type="password"
+        class="w-full border rounded px-3 py-2"
+        bind:value={password}
+      />
     </div>
     <div>
       <button class="bg-green-600 text-white px-4 py-2 rounded">Log in</button>
