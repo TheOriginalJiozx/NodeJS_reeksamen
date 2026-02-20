@@ -1,10 +1,9 @@
 <script>
   import { onMount } from "svelte";
-  import user from "../store/userStore.js";
+  import user from "../store/usersStore.js";
   import { navigate, route } from "../lib/router.js";
-  import { toast } from "../store/toastStore.js";
-  import { setUser } from "../store/userStore.js";
-  import apiFetch from "../lib/api.js";
+  import notifier from "../lib/notifier.js";
+  import { login } from "../lib/authentication.js";
 
   let username = "";
   let password = "";
@@ -27,66 +26,45 @@
     message = "Logging in...";
 
     try {
-      const res = await apiFetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      let data = {};
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        data = { message: text };
-      }
-
+      const { res, data } = await login({ username, password });
       if (!res.ok) {
         message = data && data.message ? data.message : "Login failed";
         return;
       }
-
       message = data.message || "Login successful";
-      toast("Successfully logged in", "success");
-      if (data.user) setUser(data.user);
       username = "";
       password = "";
       navigate("/profile");
       route.set("/profile");
     } catch (error) {
       message = "Network error. Please try again.";
-      toast(error && error.message ? error.message : "Network error", "error");
+      notifier.error(error && error.message ? error.message : "Network error");
     }
   }
 </script>
 
-<section class="max-w-md mx-auto mt-12 bg-white rounded shadow p-6">
-  <h2 class="text-2xl font-semibold mb-4">Log in</h2>
-  {#if message}
-    <div class="mb-4 text-sm text-green-700">{message}</div>
-  {/if}
-  <form on:submit={submit} class="space-y-4">
-    <div>
-      <label for="login-username" class="block text-sm mb-1">Username</label>
-      <input
-        id="login-username"
-        type="text"
-        class="w-full border rounded px-3 py-2"
-        bind:value={username}
-      />
+<div class="container mx-auto px-4">
+  <div class="bg-gray-100 rounded-2xl shadow-xl overflow-hidden">
+    <div class="p-8 md:p-12">
+      <section class="max-w-md mx-auto mt-3 bg-white rounded shadow p-6">
+        <h2 class="text-2xl font-semibold mb-4">Log in</h2>
+        {#if message}
+          <div class="mb-4 text-sm text-green-700">{message}</div>
+        {/if}
+        <form on:submit={submit} class="space-y-4">
+          <div>
+            <label for="login-username" class="block text-sm mb-1">Username</label>
+            <input id="login-username" type="text" class="w-full border rounded px-3 py-2" bind:value={username} />
+          </div>
+          <div>
+            <label for="login-password" class="block text-sm mb-1">Password</label>
+            <input id="login-password" type="password" class="w-full border rounded px-3 py-2" bind:value={password} />
+          </div>
+          <div>
+            <button class="bg-green-600 text-white px-4 py-2 rounded">Log in</button>
+          </div>
+        </form>
+      </section>
     </div>
-    <div>
-      <label for="login-password" class="block text-sm mb-1">Password</label>
-      <input
-        id="login-password"
-        type="password"
-        class="w-full border rounded px-3 py-2"
-        bind:value={password}
-      />
-    </div>
-    <div>
-      <button class="bg-green-600 text-white px-4 py-2 rounded">Log in</button>
-    </div>
-  </form>
-</section>
+  </div>
+</div>

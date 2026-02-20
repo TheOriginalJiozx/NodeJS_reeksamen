@@ -1,5 +1,6 @@
 import { writable } from "svelte/store";
-import logger from "../lib/logger";
+import logger from "../lib/logger.js";
+import apiFetch from "../lib/api.js";
 
 const user = writable(null);
 const userMessage = writable("");
@@ -19,33 +20,43 @@ export async function bootstrap() {
         if (cached) {
           try {
             user.set(JSON.parse(cached));
-          } catch (error) {
-            logger.warn(
-              "Could not parse cached user JSON, using raw value",
-              error && error.message ? error.message : error,
-            );
+          } catch (error) { logger.warn("Could not parse cached user JSON, using raw value", error && error.message ? error.message : error);
             user.set(cached);
           }
         }
       } catch (error) {
-        logger.warn(
-          "Could not access localStorage for user bootstrap",
-          error && error.message ? error.message : error,
-        );
+        logger.warn("Could not access localStorage for user bootstrap", error && error.message ? error.message : error);
       }
 
       try {
-        const res = await fetch("/api/me", { credentials: "include" });
+        const cachedRaw = localStorage.getItem("user");
+        let parsed = null;
+        try {
+          parsed = cachedRaw ? JSON.parse(cachedRaw) : null;
+        } catch {
+          parsed = null;
+        }
+
+        if (!parsed || !parsed.id) {
+          user.set(null);
+          userMessage.set("Not authenticated");
+          try {
+            localStorage.removeItem("user");
+          } catch (error) {
+            logger.warn("Could not remove invalid cached user", error && error.message ? error.message : error);
+          }
+          return;
+        }
+
+        const fetchUrl = `/api/users/${parsed.id}`;
+        const res = await apiFetch(fetchUrl, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           user.set(data.user || null);
           try {
             localStorage.setItem("user", JSON.stringify(data.user || null));
           } catch (error) {
-            logger.warn(
-              "Could not access localStorage to save user",
-              error && error.message ? error.message : error,
-            );
+            logger.warn("Could not access localStorage to save user", error && error.message ? error.message : error);
           }
           userMessage.set("");
           return;
@@ -59,10 +70,7 @@ export async function bootstrap() {
         }
         userMessage.set("Not authenticated");
       } catch (error) {
-        logger.error(
-          "Failed to fetch /api/me for bootstrap",
-          error && error.message ? error.message : error,
-        );
+        logger.error("Failed to fetch /api/users/:id for bootstrap", error && error.message ? error.message : error);
         userMessage.set("Could not fetch user");
       }
     } finally {
@@ -78,21 +86,22 @@ export function setUser(username) {
   try {
     localStorage.setItem("user", JSON.stringify(username));
   } catch (error) {
-    logger.warn(
-      "Could not access localStorage to save user",
-      error && error.message ? error.message : error,
-    );
+    logger.warn("Could not access localStorage to save user", error && error.message ? error.message : error);
   }
   userMessage.set("");
 }
 
 export function clearUser() {
   user.set(null);
+  try {
+    localStorage.removeItem("user");
+  } catch (error) {
+    logger.warn("Could not remove cached user from localStorage", error && error.message ? error.message : error);
+  }
+  userMessage.set("");
 }
 
-// Start bootstrapping eagerly so auth checks can wait for ready.
 if (typeof window !== "undefined") {
-  // fire-and-forget; `ready` will flip when complete
   bootstrap();
 }
 

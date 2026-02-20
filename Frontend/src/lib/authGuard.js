@@ -1,7 +1,7 @@
 import { route, navigate } from "./router.js";
-import user, { ready } from "../store/userStore.js";
+import user, { ready } from "../store/usersStore.js";
 import logger from "./logger.js";
-const protectedRoutes = new Set(["/profile", "/booking", "/mybookings", "/myresources"]);
+import { protectedRoutes } from "./authorization.js";
 
 let currentUser = null;
 user.subscribe((user) => (currentUser = user));

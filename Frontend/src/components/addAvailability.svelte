@@ -4,7 +4,7 @@
   import "flatpickr/dist/flatpickr.min.css";
   import { fetchOwnedResources, fetchAvailability } from "../fetcher/bookingFetchers.js";
   import { handleAddAvailability } from "../handler/bookingHandlers.js";
-  import { toast } from "../store/toastStore.js";
+  import notifier from "../lib/notifier.js";
   import { today, contiguousEndDates } from "../util/bookingUtils.js";
   import logger from "../lib/logger.js";
 
@@ -12,6 +12,7 @@
   let available = { resourceId: "", startDate: "", endDate: "" };
   let availability = [];
   let availableDates = [];
+  let socket = null;
 
   let startElement;
   let endElement;
@@ -37,8 +38,8 @@
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
-      const ymd = `${year}-${month}-${day}`;
-      if (!availableDates.includes(ymd)) out.push(ymd);
+      const fullDate = `${year}-${month}-${day}`;
+      if (!availableDates.includes(fullDate)) out.push(fullDate);
     }
     return out;
   }
@@ -60,8 +61,7 @@
       try {
         endFlatPickr.clear();
       } catch (error) {
-        logger.error(
-          "Failed to clear end date picker",
+        logger.error("Failed to clear end date picker",
           error && error.message ? error.message : error,
         );
       }
@@ -77,34 +77,82 @@
       dateFormat: "Y-m-d",
       enable: ownerAvailable,
       minDate: today,
-      onChange: (selectedDates, dateString) => (available.startDate = dateString || ""),
+      onChange: (_selectedDates, dateString) => (available.startDate = dateString || ""),
     });
 
     endFlatPickr = flatpickr(endElement, {
       dateFormat: "Y-m-d",
       enable: availableEndOptions,
       minDate: available.startDate || today,
-      onChange: (selectedDates, dateString) => (available.endDate = dateString || ""),
+      onChange: (_selectedDates, dateString) => (available.endDate = dateString || ""),
     });
+
+    try {
+      const socketUrl = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
+      if (typeof globalThis.io === "function") {
+        socket = globalThis.io(socketUrl, { withCredentials: true });
+        socket.on("resource:created", async () => {
+          resourcesOwned = await fetchOwnedResources();
+          if (resourcesOwned.length && !available.resourceId) available.resourceId = resourcesOwned[0].id;
+          if (available.resourceId) await load(available.resourceId);
+        });
+        socket.on("resource:deleted", async () => {
+          resourcesOwned = await fetchOwnedResources();
+          if (resourcesOwned.length && !available.resourceId) available.resourceId = resourcesOwned[0].id;
+          if (available.resourceId) await load(available.resourceId);
+        });
+        socket.on("availability:changed", async (payload) => {
+          try {
+            if (payload && String(payload.resourceId) === String(available.resourceId)) await load(available.resourceId);
+          } catch (error) {
+            logger.error("Failed to handle availability change event",
+              error && error.message ? error.message : error,
+            );
+          }
+        });
+      }
+    } catch (error) {
+      logger.warn(
+        "socket setup in addAvailability failed",
+        error && error.message ? error.message : error,
+      );
+    }
   });
 
   onDestroy(() => {
     if (startFlatPickr) startFlatPickr.destroy();
     if (endFlatPickr) endFlatPickr.destroy();
+    try {
+      if (socket) {
+        socket.removeAllListeners && socket.removeAllListeners();
+        socket.disconnect && socket.disconnect();
+      }
+    } catch (error) {
+      logger.warn("Failed to clean up socket in addAvailability", error && error.message ? error.message : error);
+    }
   });
 
   $: if (available.resourceId) load(available.resourceId);
 
   async function add() {
     if (!available.startDate || !available.endDate) {
-      toast("Select both start and end dates", "error");
+      notifier.error("Select both start and end dates");
       return;
     }
 
     const res = await handleAddAvailability(available);
     if (res && res.ok) {
-      toast("Availability added", "success");
       const id = available.resourceId;
+      try {
+        if (startFlatPickr) startFlatPickr.clear();
+      } catch (error) {
+        logger.debug("Failed to clear startFlatPickr", error && error.message ? error.message : error);
+      }
+      try {
+        if (endFlatPickr) endFlatPickr.clear();
+      } catch (error) {
+        logger.debug("Failed to clear endFlatPickr", error && error.message ? error.message : error);
+      }
       available = { resourceId: id, startDate: "", endDate: "" };
       await load(id);
     }
@@ -112,7 +160,7 @@
 </script>
 
 <section class="bg-white p-4 rounded shadow">
-  <h2 class="font-semibold mb-2">Add availability</h2>
+  <h2 class="font-semibold mb-2">Add Availability</h2>
   <div class="space-y-2">
     <select
       class="w-full border rounded p-2"

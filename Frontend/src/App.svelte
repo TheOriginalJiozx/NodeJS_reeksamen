@@ -3,12 +3,14 @@
   import { onMount } from "svelte";
   import Toast from "./components/toast.svelte";
   import Navbar from "./components/navbar.svelte";
-  import Booking from "./pages/booking.svelte";
+  import Create from "./pages/create.svelte";
+  import Book from "./pages/book.svelte";
   import Home from "./pages/home.svelte";
   import Footer from "./components/footer.svelte";
   import Login from "./pages/login.svelte";
   import Register from "./pages/register.svelte";
   import Profile from "./pages/profile.svelte";
+  import Settings from "./pages/settings.svelte";
   import MyBookings from "./pages/myBookings.svelte";
   import MyResources from "./pages/myResources.svelte";
 
@@ -17,10 +19,12 @@
 
   const routes = {
     "/": Home,
-    "/booking": Booking,
+    "/create": Create,
+    "/book": Book,
     "/login": Login,
     "/register": Register,
     "/profile": Profile,
+    "/settings": Settings,
     "/mybookings": MyBookings,
     "/myresources": MyResources,
   };

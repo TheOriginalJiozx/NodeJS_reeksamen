@@ -25,7 +25,7 @@ export async function fetchAllResources() {
 
   for (const resource of resourcesAll) {
     try {
-      const res = await fetch(`${baseURL}/resources/${resource.id}/availability`, {
+      const res = await fetch(`${baseURL}/resources/${resource.id}/availabilities`, {
         credentials: "include",
       });
       if (!res.ok) continue;
@@ -72,7 +72,7 @@ export async function fetchOwnedResources() {
 
 export async function fetchAvailability(id) {
   if (!id) return { availability: [], availableDates: [], availableRanges: [] };
-  const res = await fetch(`${baseURL}/resources/${id}/availability`, {
+  const res = await fetch(`${baseURL}/resources/${id}/availabilities`, {
     credentials: "include",
   });
   const raw = res.ok ? await res.json() : null;

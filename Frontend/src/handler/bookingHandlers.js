@@ -3,24 +3,27 @@ import logger from "../lib/logger.js";
 import apiFetch from "../lib/api.js";
 export let baseURL = "/api";
 
-export async function handleCreate(payload, file) {
-  let imageUrl = null;
-  if (!file) {
-    toast("Image is required", "error");
+export async function handleCreate(payload, files) {
+  const filesArray = Array.isArray(files) ? files : files ? [files] : [];
+  let imageUrls = [];
+  if (!filesArray.length) {
+    toast("At least one image is required", "error");
     return { ok: false };
   }
 
-  if (file) {
+  for (const file of filesArray) {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const up = await apiFetch(`${baseURL}/uploads`, {
+      const upload = await apiFetch(`${baseURL}/uploads`, {
         method: "POST",
         body: formData,
       });
-      if (up.ok) {
-        const upData = await up.json();
-        imageUrl = upData.url;
+      if (upload.ok) {
+        const uploadData = await upload.json();
+        if (uploadData && uploadData.url) imageUrls.push(uploadData.url);
+      } else {
+        logger.error("Image upload returned non-ok response");
       }
     } catch (error) {
       logger.error("Image upload failed", error && error.message ? error.message : error);
@@ -43,6 +46,7 @@ export async function handleCreate(payload, file) {
     finalName = create.name;
   }
 
+  const imageUrl = imageUrls.length ? imageUrls.join(";") : null;
   const res = await apiFetch(`${baseURL}/resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -69,7 +73,7 @@ export async function handleAddAvailability(available) {
     return { ok: false };
   }
 
-  const res = await apiFetch(`${baseURL}/resources/${available.resourceId}/availability`, {
+  const res = await apiFetch(`${baseURL}/resources/${available.resourceId}/availabilities`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(available),
@@ -106,6 +110,6 @@ export async function handleBooking(booking) {
     return { ok: false, data };
   }
 
-  toast(data.message || "Booking created", "success");
+  toast(data.message || "Booking complete", "success");
   return { ok: true, data };
 }

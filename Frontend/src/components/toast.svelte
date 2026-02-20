@@ -10,6 +10,7 @@
       class="min-w-[200px] max-w-sm px-4 py-2 rounded shadow-lg text-white flex items-center justify-between"
       class:bg-green-600={toast.type === "success"}
       class:bg-red-600={toast.type === "error"}
+      class:bg-blue-600={toast.type === "info"}
     >
       <div class="pr-4">{toast.message}</div>
       <button
