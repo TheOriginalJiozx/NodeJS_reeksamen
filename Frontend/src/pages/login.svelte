@@ -3,7 +3,8 @@
   import user from "../store/usersStore.js";
   import { navigate, route } from "../lib/router.js";
   import notifier from "../lib/notifier.js";
-  import { login } from "../lib/authentication.js";
+  import apiFetch from "../lib/api.js";
+  import { setAuth } from "../lib/authentication.js";
 
   let username = "";
   let password = "";
@@ -26,12 +27,29 @@
     message = "Logging in...";
 
     try {
-      const { res, data } = await login({ username, password });
+      const res = await apiFetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      let data = {};
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { message: text };
+      }
+
       if (!res.ok) {
         message = data && data.message ? data.message : "Login failed";
         return;
       }
+
       message = data.message || "Login successful";
+      notifier.success("Successfully logged in");
+      if (data.user) setAuth(data.user);
       username = "";
       password = "";
       navigate("/profile");

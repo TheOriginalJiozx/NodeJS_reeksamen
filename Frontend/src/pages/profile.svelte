@@ -2,7 +2,9 @@
   import { onMount } from "svelte";
   import { navigate } from "../lib/router.js";
   import notifier from "../lib/notifier.js";
-  import { clearUser } from "../store/usersStore.js";
+  import { clearAuth } from "../lib/authentication.js";
+  import authUser from "../store/usersStore.js";
+  import { allowSelfOrAdmin, isAdmin } from "../lib/authorization.js";
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
 
@@ -14,6 +16,10 @@
 
   async function deleteAccount() {
     if (!confirm("Are you sure you want to delete your account? This will remove your resources and related data.")) return;
+    if (!allowSelfOrAdmin($authUser, user?.id)) {
+      notifier.error("Forbidden: you are not allowed to delete this account");
+      return;
+    }
     deleting = true;
     try {
       const targetId = user && user.id ? user.id : null;
@@ -36,7 +42,7 @@
           logger.error("Failed to remove user from localStorage", error && error.message ? error.message : error);
         }
         try {
-          clearUser();
+          clearAuth();
         } catch (error) {}
         notifier.success(data.message || "Account deleted");
         navigate("/");
@@ -58,6 +64,11 @@
   async function exportData() {
     if (!confirm("Export your data to a JSON file?")) return;
     exporting = true;
+    if (!allowSelfOrAdmin($authUser, user?.id)) {
+      notifier.error("Forbidden: you are not allowed to export this account's data");
+      exporting = false;
+      return;
+    }
     try {
       const apiFetch = (await import("../lib/api.js")).default;
       const res = await apiFetch("/api/users/export", { method: "POST" });
@@ -146,7 +157,12 @@
             <div><strong>Full Name:</strong> {user.fullname}</div>
             <div><strong>Username:</strong> {user.username}</div>
             <div><strong>Email:</strong> {user.email}</div>
-            <div><strong>Role:</strong> {user.role}</div>
+            <div class="flex items-center">
+              <div><strong>Role:</strong> {user.role}</div>
+              {#if isAdmin($authUser)}
+                <div class="ml-3 text-sm bg-yellow-200 text-yellow-800 px-2 py-1 rounded">Admin</div>
+              {/if}
+            </div>
             <button class="bg-blue-600 text-white px-3 py-1 rounded" on:click={() => navigate("/mybookings")}>My bookings</button>
             <button class="bg-blue-600 text-white px-3 py-1 rounded" on:click={() => navigate("/myresources")}>My resources</button>
             <button class="bg-red-600 text-white px-3 py-1 rounded" on:click|preventDefault={deleteAccount} disabled={deleting}>

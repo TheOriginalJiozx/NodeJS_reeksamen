@@ -5,7 +5,8 @@
   import notifications, { notificationCount } from "../store/notificationsStore.js";
   import notifier from "../lib/notifier.js";
   import { pushNotification } from "../store/notificationsStore.js";
-  import { logout } from "../lib/authentication.js";
+  import apiFetch, { clearCsrfCache } from "../lib/api.js";
+  import { clearAuth } from "../lib/authentication.js";
   import logger from "../lib/logger.js";
 
   let navSocket = null;
@@ -88,9 +89,17 @@
   async function handleLogout(event) {
     event.preventDefault();
     try {
-      await logout();
+      await apiFetch("/api/auth/logout", { method: "POST" });
     } catch (error) {
       notifier.error(error && error.message ? error.message : "Network error");
+    }
+    try {
+      clearAuth();
+    } catch (err) {}
+    try {
+      clearCsrfCache();
+    } catch (error) {
+      logger.error("Error clearing CSRF cache on logout", error && error.message ? error.message : error);
     }
     navigate("/login");
   }

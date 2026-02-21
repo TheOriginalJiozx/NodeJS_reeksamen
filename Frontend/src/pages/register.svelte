@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import user from "../store/usersStore.js";
   import { navigate, route } from "../lib/router.js";
-  import { register } from "../lib/authentication.js";
+  import apiFetch from "../lib/api.js";
 
   let name = "";
   let email = "";
@@ -39,13 +39,29 @@
     message = "Creating account...";
 
     try {
-      const { res, data } = await register({ username: name, email, password });
+      const res = await apiFetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: name, email, password }),
+      });
+
+      let data = {};
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { message: text };
+      }
+
       if (!res.ok) {
         message = data && data.message ? data.message : "Registration failed";
         notifier.error(message);
         return;
       }
+
       message = data.message || "Account created";
+      notifier.success(message);
       name = "";
       email = "";
       password = "";

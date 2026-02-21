@@ -6,6 +6,7 @@ import { protectedRoutes } from "./authorization.js";
 let currentUser = null;
 user.subscribe((user) => (currentUser = user));
 let started = false;
+
 ready.subscribe((isReady) => {
   if (!isReady) return;
   if (started) return;
