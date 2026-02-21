@@ -7,7 +7,7 @@ export const selectResourceOwner = `SELECT owner FROM resources WHERE id = $1`;
 export const selectResourceImage = `SELECT image FROM resources WHERE id = $1`;
 export const deleteResource = `DELETE FROM resources WHERE id = $1`;
 
-export const availabilitiesForResource = `SELECT DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate,
+export const availabilitiesForResource = `SELECT id, DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate,
                         DATE_FORMAT(end_date, '%Y-%m-%d') AS endDate
                  FROM availabilities
                  WHERE resource_id = $1

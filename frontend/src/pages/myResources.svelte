@@ -6,11 +6,14 @@
   import { removeNotificationsByBookingId } from "../store/notificationsStore.js";
   import BookingList from "../components/bookingList.svelte";
   import ResourceImages from "../components/resourceImages.svelte";
+  import { fetchAvailability } from "../fetcher/bookingFetchers.js";
+  import { handleDeleteAvailability } from "../handler/bookingHandlers.js";
 
   let loading = true;
   let user = null;
   let resources = [];
   let resourceBookings = {};
+  let resourceAvailabilities = {};
   let error = null;
   let socket = null;
   let previewImage = null;
@@ -18,7 +21,7 @@
   let previewIndex = 0;
 
   function openPreviewFromResource(resource, image) {
-    previewImages = String(resource.image || "").split(";").filter(Boolean);
+    previewImages = String(resource.image).split(";").filter(Boolean);
     previewIndex = Math.max(0, previewImages.indexOf(image));
     previewImage = previewImages[previewIndex] || null;
   }
@@ -40,9 +43,9 @@
     if (socket?.disconnect) socket.disconnect();
   });
 
-  async function fetchBookingsFor(resourceId) {
+  async function fetchBookingsFor(resourceID) {
     try {
-      const res = await apiFetch(`/api/bookings?resourceId=${resourceId}`, { credentials: "include" });
+      const res = await apiFetch(`/api/bookings?resourceID=${resourceID}`, { credentials: "include" });
       if (!res.ok) return [];
       const data = await res.json();
       return Array.isArray(data.bookings) ? data.bookings : data.bookings || [];
@@ -56,23 +59,28 @@
     if (!res.ok) return;
     resources = await res.json();
     const bookingsList = await Promise.all(resources.map((resource) => fetchBookingsFor(resource.id)));
+    const availableList = await Promise.all(resources.map((resource) => fetchAvailability(resource.id)));
     resourceBookings = {};
-    resources.forEach((resource, index) => (resourceBookings[String(resource.id)] = bookingsList[index] || []));
+    resourceAvailabilities = {};
+    resources.forEach((resource, index) => {
+      resourceBookings[String(resource.id)] = bookingsList[index] || [];
+      resourceAvailabilities[String(resource.id)] = (availableList[index] && availableList[index].availability) || [];
+    });
   }
 
-  async function confirmBooking(bookingId, resourceId) {
+  async function confirmBooking(bookingId, resourceID) {
     const res = await apiFetch(`/api/bookings/${bookingId}/confirm`, { method: "PATCH" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       alert(data.message || "Failed to confirm booking");
       return;
     }
-    resourceBookings[String(resourceId)] = await fetchBookingsFor(resourceId);
+    resourceBookings[String(resourceID)] = await fetchBookingsFor(resourceID);
     removeNotificationsByBookingId(bookingId);
     notifier?.success?.("Booking confirmed");
   }
 
-  async function declineBooking(bookingId, resourceId) {
+  async function declineBooking(bookingId, resourceID) {
     if (!confirm("Decline this booking request?")) return;
     const res = await apiFetch(`/api/bookings/${bookingId}`, { method: "DELETE" });
     if (!res.ok) {
@@ -80,7 +88,7 @@
       alert(data.message || "Failed to decline booking");
       return;
     }
-    resourceBookings[String(resourceId)] = await fetchBookingsFor(resourceId);
+    resourceBookings[String(resourceID)] = await fetchBookingsFor(resourceID);
     removeNotificationsByBookingId(bookingId);
     notifier?.success?.("Booking declined");
   }
@@ -94,6 +102,15 @@
       return;
     }
     resources = resources.filter((r) => String(r.id) !== String(id));
+  }
+
+  async function deleteAvailabilityForResource(resourceId, availabilityId) {
+    if (!confirm("Delete this availability?")) return;
+    const res = await handleDeleteAvailability(resourceId, availabilityId);
+    if (res && res.ok) {
+      resourceAvailabilities[String(resourceId)] = (await fetchAvailability(resourceId)).availability || [];
+      notifier?.success?.("Availability deleted");
+    }
   }
 
   onMount(async () => {
@@ -158,8 +175,23 @@
                 </tr>
                 <tr>
                   <td colspan="4" class="bg-gray-50 px-4 py-2">
-                    <div class="text-sm font-semibold mb-2">Bookings</div>
-                    <BookingList bookings={resourceBookings[String(resource.id)]} resourceId={resource.id} confirm={confirmBooking} decline={declineBooking} />
+                        <div class="text-sm font-semibold mb-2">Availabilities</div>
+                        {#if Array.isArray(resourceAvailabilities[String(resource.id)]) && resourceAvailabilities[String(resource.id)].length > 0}
+                          <ul class="text-sm space-y-1 mb-3">
+                            {#each resourceAvailabilities[String(resource.id)] as a}
+                              <li class="flex items-center justify-between">
+                                <div>{a.startDate || a.start_date} — {a.endDate || a.end_date}</div>
+                                <div>
+                                  <button class="bg-red-600 text-white px-2 py-1 rounded" on:click={() => deleteAvailabilityForResource(resource.id, a.id || a.ID || a.insertId)}>Delete</button>
+                                </div>
+                              </li>
+                            {/each}
+                          </ul>
+                        {:else}
+                          <div class="text-xs text-gray-600 mb-3">No availabilities</div>
+                        {/if}
+                        <div class="text-sm font-semibold mb-2">Bookings</div>
+                        <BookingList bookings={resourceBookings[String(resource.id)]} resourceID={resource.id} confirm={confirmBooking} decline={declineBooking} />
                   </td>
                 </tr>
               {/each}

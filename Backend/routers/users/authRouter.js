@@ -38,9 +38,9 @@ router.post(`${API}/auth/login`, authLimiter, async (req, res) => {
       req.session.user = {
         id: user.id,
         username: user.username,
-          fullname: user.fullname || null,
-          role: user.role,
-          email: user.email,
+        fullname: user.fullname || null,
+        role: user.role,
+        email: user.email,
       };
       return resolve(res.status(200).json({ message: "Login successful", user: req.session.user }));
     });
@@ -72,6 +72,11 @@ router.post(`${API}/auth/register`, authLimiter, async (req, res) => {
 
     if (!/^[A-Za-z0-9_]+$/.test(username)) {
       return res.status(400).json({ message: "Username may only contain letters, numbers and underscores" });
+    }
+
+    const chosenUsername = await db.query(userQueries.findUserByUsername, [username]);
+    if (chosenUsername.rowCount > 0) {
+      return res.status(409).json({ message: "Username already in use" });
     }
 
     const chosenEmail = await db.query(userQueries.findUserByEmail, [email]);

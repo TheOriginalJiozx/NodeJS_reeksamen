@@ -93,6 +93,23 @@ export async function handleAddAvailability(available) {
   return { ok: true, data };
 }
 
+export async function handleDeleteAvailability(resourceId, availabilityId) {
+  if (!resourceId || !availabilityId) return { ok: false };
+  const res = await apiFetch(`${baseURL}/resources/${resourceId}/availabilities/${availabilityId}`, {
+    method: "DELETE",
+  });
+  let data = {};
+  const content = res.headers.get("content-type") || "";
+  if (content.includes("application/json")) data = await res.json();
+  else data = { message: await res.text() };
+  if (!res.ok) {
+    toast(data.message || "Failed to delete availability", "error");
+    return { ok: false, data };
+  }
+  toast(data.message || "Availability deleted", "success");
+  return { ok: true, data };
+}
+
 export async function handleBooking(booking) {
   const res = await apiFetch(`${baseURL}/bookings`, {
     method: "POST",

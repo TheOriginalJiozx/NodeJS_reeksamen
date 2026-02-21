@@ -22,8 +22,21 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
 const app = express();
 
 const MySQLStore = expressMySQLSession(session);
-const sessionStore = new MySQLStore(sessionOptions);
-global.sessionStore = sessionStore;
+let sessionStore;
+try {
+  sessionStore = new MySQLStore(sessionOptions);
+  global.sessionStore = sessionStore;
+} catch (error) {
+  logger.warn("Could not initialize MySQL session store, falling back to MemoryStore:", error.message);
+  sessionStore = new session.MemoryStore();
+  global.sessionStore = sessionStore;
+}
+
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) {
+  logger.error("Environment variable SESSION_SECRET is not set. Set SESSION_SECRET and restart the server.");
+  process.exit(1);
+}
 
 app.use(express.json());
 

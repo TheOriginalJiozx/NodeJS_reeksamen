@@ -1,8 +1,8 @@
 <script>
   export let bookings = [];
-  export let resourceId = null;
-  export let confirm = (id, resourceID) => {};
-  export let decline = (id, resourceID) => {};
+  export let resourceID = null;
+  export let confirm = (_id, _resourceID) => {};
+  export let decline = (_id, _resourceID) => {};
 </script>
 
 {#if Array.isArray(bookings) && bookings.length > 0}
@@ -11,7 +11,7 @@
       <li class="flex items-center justify-between">
         <div>
           <div><strong>{booking.booker}</strong></div>
-          <div class="text-xs text-gray-600">{booking.start_date || booking.startDate} — {booking.end_date || booking.endDate}</div>
+          <div class="text-xs text-gray-600">{booking.start_date} — {booking.end_date}</div>
         </div>
         <div>
           {#if booking.confirmed === 1}
@@ -20,8 +20,8 @@
             <span class="text-sm text-red-600">Declined</span>
           {:else}
             <div class="flex gap-2">
-              <button type="button" class="bg-blue-600 text-white px-2 py-1 rounded" on:click={() => confirm(booking.id, resourceId)}>Confirm</button>
-              <button type="button" class="bg-gray-300 text-gray-800 px-2 py-1 rounded" on:click={() => decline(booking.id, resourceId)}>Decline</button>
+              <button type="button" class="bg-blue-600 text-white px-2 py-1 rounded" on:click={() => confirm(booking.id, resourceID)}>Confirm</button>
+              <button type="button" class="bg-gray-300 text-gray-800 px-2 py-1 rounded" on:click={() => decline(booking.id, resourceID)}>Decline</button>
             </div>
           {/if}
         </div>

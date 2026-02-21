@@ -83,6 +83,7 @@ export async function fetchAvailability(id) {
 
   if (Array.isArray(raw)) {
     availability = raw.map((available) => ({
+      id: available.id,
       startDate: available.startDate
         ? available.startDate.length >= 10
           ? available.startDate.substring(0, 10)
@@ -97,6 +98,7 @@ export async function fetchAvailability(id) {
     availableDates = computeDatesFromAvailabilities(availability);
   } else if (raw.availableDates) {
     availability = (raw.availabilities || []).map((available) => ({
+      id: available.id,
       startDate: available.startDate,
       endDate: available.endDate,
     }));

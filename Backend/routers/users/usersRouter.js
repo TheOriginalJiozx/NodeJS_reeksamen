@@ -29,13 +29,13 @@ async function collectSessionIdsForUsername(username) {
       const ids = [];
       if (Array.isArray(sessions)) {
         for (const item of sessions) {
-          const sid = item.session_id || item.id || item.key;
-          const sess = item.session || item.data || item;
-          if (sid && sess?.user?.username === username) ids.push(sid);
+          const sessionID = item.session_id || item.id || item.key;
+          const session = item.session || item.data || item;
+          if (sessionID && session?.user?.username === username) ids.push(sessionID);
         }
       } else if (sessions && typeof sessions === "object") {
-        for (const sid of Object.keys(sessions)) {
-          if (sessions[sid]?.user?.username === username) ids.push(sid);
+        for (const sessionID of Object.keys(sessions)) {
+          if (sessions[sessionID]?.user?.username === username) ids.push(sessionID);
         }
       }
       resolve(ids);
@@ -47,14 +47,14 @@ async function destroySessionIds(ids) {
   if (!ids.length) return;
   const store = global.sessionStore;
   if (!store || typeof store.destroy !== "function") return;
-  await Promise.all(ids.map((id) => new Promise((r) => store.destroy(id, () => r()))));
+  await Promise.all(ids.map((id) => new Promise((resource) => store.destroy(id, () => resource()))));
 }
 
 router.get(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
-  const idParam = req.params.id;
-  if (!isValidId(idParam)) return res.status(400).json({ message: "Invalid user id" });
+  const idParameter = req.params.id;
+  if (!isValidId(idParameter)) return res.status(400).json({ message: "Invalid user id" });
   try {
-    const result = await db.query(userQueries.selectUserById, [idParam]);
+    const result = await db.query(userQueries.selectUserById, [idParameter]);
     if (!result.rowCount) return res.status(404).json({ message: "User not found" });
     return res.status(200).json({ user: result.rows[0] });
   } catch (error) {
@@ -84,11 +84,11 @@ router.post(`${API}/users/export`, isLoggedIn, async (req, res) => {
 });
 
 router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
-  const idParam = req.params.id;
-  if (!isValidId(idParam)) return res.status(400).json({ message: "Invalid user id" });
+  const idParameter = req.params.id;
+  if (!isValidId(idParameter)) return res.status(400).json({ message: "Invalid user id" });
 
   try {
-    const userRow = await db.query(userQueries.selectUserById, [idParam]);
+    const userRow = await db.query(userQueries.selectUserById, [idParameter]);
     const username = userRow.rows?.[0]?.username;
     if (!username) return res.status(404).json({ message: "User not found" });
 
@@ -96,22 +96,22 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
     if (conflict?.rowCount > 0) return res.status(409).json({ message: "Cannot delete account while active bookings exist for your resources" });
 
     const images = await db.query(userQueries.selectImagesByOwner, [username]);
-    const resourceImages = (images.rows || []).map((r) => r.image).filter(Boolean);
+    const resourceImages = (images.rows || []).map((resource) => resource.image).filter(Boolean);
 
     try {
       await db.query("BEGIN");
       await db.query(userQueries.deleteBookingsByOwnerResources, [username]);
       await db.query(userQueries.deleteAvailabilitiesByOwnerResources, [username]);
       await db.query(userQueries.deleteResourcesByOwner, [username]);
-      await db.query(userQueries.deleteUserById, [idParam]);
+      await db.query(userQueries.deleteUserById, [idParameter]);
       await db.query("COMMIT");
-    } catch (txErr) {
+    } catch (transactionError) {
       try {
         await db.query("ROLLBACK");
-      } catch (rbErr) {
-        logger.error(rbErr, "DELETE /api/users/:id rollback error");
+      } catch (rollbackError) {
+        logger.error(rollbackError, "DELETE /api/users/:id rollback error");
       }
-      throw txErr;
+      throw transactionError;
     }
 
     const sessionIds = await collectSessionIdsForUsername(username);
@@ -120,7 +120,7 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
     for (const resourceImage of resourceImages) {
       if (!resourceImage || !String(resourceImage).includes(`${API}uploads/`)) continue;
       const filename = String(resourceImage).split(`${API}uploads/`).pop();
-      const uploadPath = path.resolve("./Frontend/public/uploads", filename);
+      const uploadPath = path.resolve("./frontend/public/uploads", filename);
       if (fs.existsSync(uploadPath)) {
         try {
           fs.unlinkSync(uploadPath);
@@ -142,40 +142,41 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
 });
 
 router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
-  const idParam = req.params.id;
-  if (!isValidId(idParam)) return res.status(400).json({ message: "Invalid user id" });
+  const idParameter = req.params.id;
+  if (!isValidId(idParameter)) return res.status(400).json({ message: "Invalid user id" });
 
   try {
     const { username: newUsername, currentPassword, newPassword } = req.body || {};
     if (!newUsername && !newPassword) return res.status(400).json({ message: "No changes provided" });
 
-    const userRow = await db.query(userQueries.selectUserById, [idParam]);
+    const userRow = await db.query(userQueries.selectUserById, [idParameter]);
     const existing = userRow.rows?.[0];
     if (!existing) return res.status(404).json({ message: "User not found" });
 
     if (newUsername && newUsername !== existing.username) {
       if (!/^[A-Za-z0-9_]+$/.test(newUsername)) return res.status(400).json({ message: "Username may only contain letters, numbers and underscores" });
       const taken = await db.query(userQueries.findUserByUsername, [newUsername]);
-      if (taken.rowCount > 0 && String(taken.rows[0].id) !== String(idParam)) return res.status(409).json({ message: "Username already in use" });
+      if (taken.rowCount > 0 && String(taken.rows[0].id) !== String(idParameter)) return res.status(409).json({ message: "Username already in use" });
 
       const oldUsername = existing.username;
+      
       try {
         await db.query("BEGIN");
-        await db.query(userQueries.updateUsername, [newUsername, idParam]);
+        await db.query(userQueries.updateUsername, [newUsername, idParameter]);
         await db.query(userQueries.updateBookingsBooker, [newUsername, oldUsername]);
         await db.query(userQueries.updateResourcesOwner, [newUsername, oldUsername]);
         await db.query("COMMIT");
-      } catch (txErr) {
+      } catch (transactionError) {
         try {
           await db.query("ROLLBACK");
-        } catch (rbErr) {
-          logger.error(rbErr, "Failed rollback after username update error");
+        } catch (rollbackError) {
+          logger.error(rollbackError, "Failed rollback after username update error");
         }
-        return sendServerError(res, "PATCH /api/users/:id username tx error", txErr);
+        return sendServerError(res, "PATCH /api/users/:id username tx error", transactionError);
       }
 
       try {
-        if (req.session?.user?.id && String(req.session.user.id) === String(idParam)) req.session.user.username = newUsername;
+        if (req.session?.user?.id && String(req.session.user.id) === String(idParameter)) req.session.user.username = newUsername;
       } catch (error) {
         logger.debug("Could not update session username after change", error);
       }
@@ -194,7 +195,7 @@ router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res
       const stored = loginRow.rows?.[0]?.password_hash || null;
       if (!auth.validatePassword(currentPassword, stored)) return res.status(403).json({ message: "Current password incorrect" });
       const hashed = auth.encryptPassword(newPassword);
-      await db.query(userQueries.updatePasswordHash, [hashed, idParam]);
+      await db.query(userQueries.updatePasswordHash, [hashed, idParameter]);
     }
 
     return res.status(200).json({ message: "Account updated" });
