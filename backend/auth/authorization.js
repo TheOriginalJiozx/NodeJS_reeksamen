@@ -1,9 +1,12 @@
+import logger from "../lib/logger.js";
+
 export function requireRole(role) {
   return function (req, res, next) {
     try {
       if (req.user && req.user.role === role) return next();
       return res.status(403).json({ message: "Forbidden" });
     } catch (error) {
+      logger.error(error, "Authorization error in requireRole");
       return res.status(500).json({ message: "Internal server error" });
     }
   };
@@ -20,6 +23,7 @@ export function allowSelfOrAdmin(paramName = "id") {
       if (req.user?.role === "admin") return next();
       return res.status(403).json({ message: "Forbidden" });
     } catch (error) {
+      logger.error(error, "Authorization error in allowSelfOrAdmin");
       return res.status(500).json({ message: "Internal server error" });
     }
   };

@@ -93,36 +93,19 @@ export async function handleAddAvailability(available) {
   return { ok: true, data };
 }
 
-export async function handleDeleteAvailability(resourceId, availabilityId) {
-  if (!resourceId || !availabilityId) return { ok: false };
-  const res = await apiFetch(`${baseURL}/resources/${resourceId}/availabilities/${availabilityId}`, {
-    method: "DELETE",
-  });
-  let data = {};
-  const content = res.headers.get("content-type") || "";
-  if (content.includes("application/json")) data = await res.json();
-  else data = { message: await res.text() };
-  if (!res.ok) {
-    toast(data.message || "Failed to delete availability", "error");
-    return { ok: false, data };
-  }
-  toast(data.message || "Availability deleted", "success");
-  return { ok: true, data };
-}
-
 export async function handleBooking(booking) {
-  const res = await apiFetch(`${baseURL}/bookings`, {
+  const response = await apiFetch(`${baseURL}/bookings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(booking),
   });
 
   let data = {};
-  const content = res.headers.get("content-type") || "";
-  if (content.includes("application/json")) data = await res.json();
-  else data = { message: await res.text() };
+  const content = response.headers.get("content-type") || "";
+  if (content.includes("application/json")) data = await response.json();
+  else data = { message: await response.text() };
 
-  if (!res.ok) {
+  if (!response.ok) {
     toast(data.message || "Failed to create booking", "error");
     return { ok: false, data };
   }

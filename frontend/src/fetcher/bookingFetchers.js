@@ -62,14 +62,6 @@ export async function fetchTypes() {
   return types;
 }
 
-export async function fetchOwnedResources() {
-  const res = await fetch(`${baseURL}/resources/mine`, {
-    credentials: "include",
-  });
-  const resourcesOwned = res.ok ? await res.json() : [];
-  return resourcesOwned;
-}
-
 export async function fetchAvailability(id) {
   if (!id) return { availability: [], availableDates: [], availableRanges: [] };
   const res = await fetch(`${baseURL}/resources/${id}/availabilities`, {

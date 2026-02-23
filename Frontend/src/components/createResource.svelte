@@ -1,10 +1,9 @@
 <script>
   import { onMount } from "svelte";
-  import {
-    fetchTypes,
-    fetchAllResources,
-    fetchOwnedResources,
-  } from "../fetcher/bookingFetchers.js";
+  import { fetchTypes, fetchAllResources } from "../fetcher/bookingFetchers.js";
+  import apiFetch from "../lib/api.js";
+  import CarFields from "./CarFields.svelte";
+  import ImageUploader from "./imageUploader.svelte";
   import { handleCreate } from "../handler/bookingHandlers.js";
   import logger from "../lib/logger.js";
 
@@ -32,56 +31,42 @@
         const all = await fetchAllResources();
         resourcesAll = all.resourcesAll || [];
       } catch (error) {
-        logger.error("Failed to fetch all resources",
-          error && error.message ? error.message : error,
-        );
+        logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
       }
       try {
-        resourcesOwned = await fetchOwnedResources();
+        const cached = localStorage.getItem("user");
+        const parsed = cached ? JSON.parse(cached) : null;
+        const userId = parsed?.id;
+        if (userId) {
+          const r = await apiFetch(`/api/users/${userId}/resources`);
+          if (r.ok) resourcesOwned = await r.json();
+        }
       } catch (error) {
-        logger.error(
-          "Failed to fetch owned resources",
-          error && error.message ? error.message : error,
-        );
+        logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
       }
     } catch (error) {
-      logger.error(
-        "Failed to fetch resource types",
-        error && error.message ? error.message : error,
-      );
+      logger.error("Failed to fetch resource types", error && error.message ? error.message : error);
     }
   });
 
   $: selectedType = types.find((type) => String(type.id) === String(create.type));
-  $: isCarCreate = selectedType && /car/i.test(String(selectedType.name || ""));
-  const brandModels = {
-    Toyota: ["Yaris", "Corolla", "Prius", "Camry"],
-    Ford: ["Fiesta", "Focus", "Mustang"],
-    BMW: ["3 Series", "5 Series", "X3", "X5"],
-    Mercedes: ["A-Class", "C-Class", "E-Class"],
-    Volkswagen: ["Golf", "Polo", "Passat"],
-    Honda: ["Civic", "Accord", "Jazz"],
-  };
-  $: modelsForBrand = createBrand && brandModels[createBrand] ? brandModels[createBrand] : [];
+  $: isCarCreate = selectedType && /car/i.test(String(selectedType.name));
 
   async function submit() {
     if (submitting) return;
     submitting = true;
     try {
-      const finalBrand = createBrand === "Other" ? (createBrandOther || "Other") : createBrand;
+      const finalBrand = createBrand === "Other" ? createBrandOther || "Other" : createBrand;
       let finalModel = "";
       if (createBrand === "Other") {
         finalModel = createModel || createModelCustom || "";
-      } else if (modelsForBrand.length) {
+      } else if (createBrand) {
         finalModel = createModelSelect === "Other" ? createModelCustom || "" : createModelSelect || "";
       } else {
         finalModel = createModel || "";
       }
 
-      const res = await handleCreate(
-        { create, isCarCreate, createBrand: finalBrand, createModel: finalModel, createYear },
-        createImageFiles,
-      );
+      const res = await handleCreate({ create, isCarCreate, createBrand: finalBrand, createModel: finalModel, createYear }, createImageFiles);
 
       if (res && res.ok) {
         create = { name: "", type: "" };
@@ -90,24 +75,24 @@
         try {
           if (createImageInput) createImageInput.value = null;
         } catch (error) {
-          logger.error("Failed to reset file input",
-            error && error.message ? error.message : error,
-          );
+          logger.error("Failed to reset file input", error && error.message ? error.message : error);
         }
         try {
           const all = await fetchAllResources();
           resourcesAll = all.resourcesAll || [];
         } catch (error) {
-          logger.error("Failed to fetch all resources",
-            error && error.message ? error.message : error,
-          );
+          logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
         }
         try {
-          resourcesOwned = await fetchOwnedResources();
+          const cached = localStorage.getItem("user");
+          const parsed = cached ? JSON.parse(cached) : null;
+          const userId = parsed?.id;
+          if (userId) {
+            const resources = await apiFetch(`/api/users/${userId}/resources`);
+            if (resources.ok) resourcesOwned = await resources.json();
+          }
         } catch (error) {
-          logger.error("Failed to fetch owned resources",
-            error && error.message ? error.message : error,
-          );
+          logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
         }
       }
     } finally {
@@ -131,67 +116,10 @@
     </select>
 
     {#if isCarCreate}
-      <div class="grid grid-cols-3 gap-2">
-        <select class="border rounded p-2" bind:value={createBrand}>
-          <option value="">Brand</option>
-          {#each Object.keys(brandModels) as brand}
-            <option value={brand}>{brand}</option>
-          {/each}
-          <option value="Other">Other</option>
-        </select>
-
-        {#if createBrand === 'Other'}
-          <input class="border rounded p-2" placeholder="Brand" bind:value={createBrandOther} />
-          <input class="border rounded p-2" placeholder="Model" bind:value={createModelCustom} />
-        {:else}
-          {#if modelsForBrand.length}
-            <select class="border rounded p-2" bind:value={createModelSelect}>
-              <option value="">Model</option>
-              {#each modelsForBrand as model}
-                <option value={model}>{model}</option>
-              {/each}
-              <option value="Other">Other</option>
-            </select>
-            {#if createModelSelect === 'Other'}
-              <input class="border rounded p-2" placeholder="Model" bind:value={createModelCustom} />
-            {/if}
-          {:else}
-            <input class="border rounded p-2" placeholder="Model" bind:value={createModel} />
-          {/if}
-        {/if}
-
-        <select class="border rounded p-2" bind:value={createYear}>
-          <option value="">Year</option>
-          {#each years as year}
-            <option value={year}>{year}</option>
-          {/each}
-        </select>
-      </div>
+      <CarFields bind:createBrand bind:createModel bind:createBrandOther bind:createModelSelect bind:createModelCustom bind:createYear {years} />
     {/if}
 
-    <input
-      id="create-image"
-      type="file"
-      accept="image/*"
-      multiple
-      class="sr-only"
-      bind:this={createImageInput}
-      on:change={(event) => {
-        createImageFiles = event.target.files ? Array.from(event.target.files) : [];
-      }}
-    />
-    <div class="flex items-center gap-2">
-      <button
-        type="button"
-        class="bg-gray-200 text-gray-800 px-3 py-1 rounded"
-        on:click={() => createImageInput && createImageInput.click()}>Choose images</button
-      >
-      {#if createImageFiles.length}
-        <div class="text-sm">
-          {createImageFiles.length} file(s): {createImageFiles.map(f=>f.name).join(", ")}
-        </div>
-      {/if}
-    </div>
+    <ImageUploader bind:createImageFiles bind:createImageInput />
 
     <div class="flex gap-2">
       <button class="bg-blue-600 text-white px-4 py-2 rounded" on:click|preventDefault={submit} disabled={submitting}>

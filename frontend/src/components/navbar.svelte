@@ -95,7 +95,7 @@
     }
     try {
       clearAuth();
-    } catch (err) {}
+    } catch (error) {}
     try {
       clearCsrfCache();
     } catch (error) {

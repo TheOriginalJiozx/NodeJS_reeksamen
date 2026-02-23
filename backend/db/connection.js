@@ -58,27 +58,12 @@ try {
   pool = null;
 }
 
-function convertQuery(text) {
-  if (!text) return text;
-  return text.replace(/\$([0-9]+)/g, "?");
-}
-
-async function query(text, params = []) {
+async function query(sql, values = []) {
   if (!pool) {
-    return { rowCount: 0, rows: [] };
+    throw new Error("Database connection not available");
   }
-
-  const sqlQuery = convertQuery(text);
-  const [rows] = await pool.query(sqlQuery, params);
-
-  if (Array.isArray(rows)) {
-    return { rowCount: rows.length, rows };
-  }
-
-  return {
-    rowCount: rows.affectedRows || 0,
-    rows: rows.insertId ? [{ insertId: rows.insertId }] : [],
-  };
+  const [rows] = await pool.query(sql, values);
+  return { rows, rowCount: rows.length };
 }
 
 const db = { query };

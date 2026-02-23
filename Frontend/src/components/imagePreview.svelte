@@ -46,6 +46,7 @@
     aria-modal="true"
     tabindex="0"
     on:click={(event) => { if (event.target === event.currentTarget) close(); }}
+    on:keydown={onKey}
   >
     <div class="relative max-w-3xl max-h-[80vh]">
       <img src={current} alt={label} class="max-w-full max-h-[80vh] rounded shadow-lg" />

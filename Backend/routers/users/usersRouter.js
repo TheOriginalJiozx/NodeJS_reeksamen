@@ -1,8 +1,6 @@
 import { Router } from "express";
 import db from "../../db/connection.js";
-import * as resourceQueries from "../../db/queries/resources.js";
 import * as bookingQueries from "../../db/queries/bookings.js";
-import * as availabilityQueries from "../../db/queries/availabilities.js";
 import * as userQueries from "../../db/queries/users.js";
 import { isLoggedIn } from "../../middleware/authMiddleware.js";
 import { allowSelfOrAdmin } from "../../auth/authorization.js";
@@ -10,6 +8,7 @@ import logger from "../../lib/logger.js";
 import fs from "fs";
 import path from "path";
 import auth from "../../utils/authorizerUtils.js";
+import { collectSessionIdsForUsername, destroySessionIds } from "../../lib/sessionUtils.js";
 
 const router = Router();
 const API = "/api";
@@ -20,36 +19,6 @@ const sendServerError = (res, tag, error) => {
   return res.status(500).json({ message: "Internal server error" });
 };
 
-async function collectSessionIdsForUsername(username) {
-  const store = global.sessionStore;
-  if (!store || typeof store.all !== "function") return [];
-  return new Promise((resolve) => {
-    store.all((error, sessions) => {
-      if (error) return resolve([]);
-      const ids = [];
-      if (Array.isArray(sessions)) {
-        for (const item of sessions) {
-          const sessionID = item.session_id || item.id || item.key;
-          const session = item.session || item.data || item;
-          if (sessionID && session?.user?.username === username) ids.push(sessionID);
-        }
-      } else if (sessions && typeof sessions === "object") {
-        for (const sessionID of Object.keys(sessions)) {
-          if (sessions[sessionID]?.user?.username === username) ids.push(sessionID);
-        }
-      }
-      resolve(ids);
-    });
-  });
-}
-
-async function destroySessionIds(ids) {
-  if (!ids.length) return;
-  const store = global.sessionStore;
-  if (!store || typeof store.destroy !== "function") return;
-  await Promise.all(ids.map((id) => new Promise((resource) => store.destroy(id, () => resource()))));
-}
-
 router.get(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
   const idParameter = req.params.id;
   if (!isValidId(idParameter)) return res.status(400).json({ message: "Invalid user id" });
@@ -59,27 +28,6 @@ router.get(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res) 
     return res.status(200).json({ user: result.rows[0] });
   } catch (error) {
     return sendServerError(res, "GET /api/users/:id error", error);
-  }
-});
-
-router.post(`${API}/users/export`, isLoggedIn, async (req, res) => {
-  const userId = req.user?.id;
-  if (!userId) return res.status(400).json({ message: "Invalid user" });
-  try {
-    const result = await db.query(userQueries.selectUserById, [userId]);
-    const userData = result.rows[0] || null;
-    const exportData = { user: userData, resources: [], bookings: [], availabilities: [] };
-    if (userData?.username) {
-      exportData.resources = (await db.query(resourceQueries.getOwnedResources, [userData.username])).rows || [];
-      exportData.bookings = (await db.query(bookingQueries.getBookingsForUserOrOwner, [userData.username])).rows || [];
-      exportData.availabilities = (await db.query(availabilityQueries.getAvailabilitiesForOwnerResources, [userData.username])).rows || [];
-    }
-    const payload = JSON.stringify(exportData, null, 2);
-    res.setHeader("Content-Disposition", 'attachment; filename="user-data.json"');
-    res.setHeader("Content-Type", "application/json");
-    return res.status(200).send(payload);
-  } catch (error) {
-    return sendServerError(res, "POST /api/users/export error", error);
   }
 });
 
@@ -99,7 +47,7 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
     const resourceImages = (images.rows || []).map((resource) => resource.image).filter(Boolean);
 
     try {
-      await db.query("BEGIN");
+      await db.query("BEGIN TRANSACTION");
       await db.query(userQueries.deleteBookingsByOwnerResources, [username]);
       await db.query(userQueries.deleteAvailabilitiesByOwnerResources, [username]);
       await db.query(userQueries.deleteResourcesByOwner, [username]);
@@ -192,7 +140,7 @@ router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res
     if (newPassword) {
       if (!currentPassword) return res.status(400).json({ message: "Current password required" });
       const loginRow = await db.query(userQueries.selectUserForLogin, [existing.username]);
-      const stored = loginRow.rows?.[0]?.password_hash || null;
+      const stored = loginRow.rows?.[0]?.passwordHash || null;
       if (!auth.validatePassword(currentPassword, stored)) return res.status(403).json({ message: "Current password incorrect" });
       const hashed = auth.encryptPassword(newPassword);
       await db.query(userQueries.updatePasswordHash, [hashed, idParameter]);

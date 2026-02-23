@@ -31,7 +31,7 @@
       const data = await res.json();
       bookings = Array.isArray(data.bookings) ? data.bookings : data.bookings || [];
       if (user && user.username) bookings = bookings.filter((bookings) => String(bookings.booker) === String(user.username));
-      bookings.sort((left, right) => new Date(left.start_date || left.startDate || 0) - new Date(right.start_date || right.startDate || 0));
+      bookings.sort((left, right) => new Date(left.startDate) - new Date(right.startDate));
     } catch (error) {
       logger.error("Failed to fetch bookings");
     }

@@ -18,16 +18,14 @@ const authLimiter = rateLimit({
 });
 
 router.post(`${API}/auth/login`, authLimiter, async (req, res) => {
-  const { username, password } = req.body;
+  const username = (req.body.username || "").trim();
+  const password = req.body.password || "";
+
   const result = await db.query(userQueries.selectUserForLogin, [username]);
   const user = result.rows[0];
 
-  if (result.rowCount === 0 || !auth.validatePassword(password, user && user.password_hash)) {
+  if (result.rowCount === 0 || !auth.validatePassword(password, user && user.passwordHash)) {
     return res.status(401).json({ message: "Invalid username or password" });
-  }
-
-  if (user.verified === 0) {
-    return res.status(403).json({ message: "Account not verified" });
   }
 
   return new Promise((resolve) => {
@@ -64,7 +62,9 @@ router.post(`${API}/auth/logout`, isLoggedIn, (req, res) => {
 
 router.post(`${API}/auth/register`, authLimiter, async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const username = (req.body.username || "").trim();
+    const email = (req.body.email || "").trim().toLowerCase();
+    const password = req.body.password || "";
 
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Missing required fields" });

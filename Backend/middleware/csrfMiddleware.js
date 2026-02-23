@@ -7,7 +7,7 @@ export default function csrfMiddleware({ exemptPaths = [] } = {}) {
       if (exemptPaths.includes(req.path)) return next();
 
       const headerToken = req.get("x-csrf-token") || req.get("x-xsrf-token");
-      const bodyToken = req.body && (req.body._csrf || req.body.csrfToken);
+      const bodyToken = req.body && req.body.csrfToken;
       const token = headerToken || bodyToken;
 
       if (!req.session) return res.status(403).json({ message: "Missing session for CSRF validation" });

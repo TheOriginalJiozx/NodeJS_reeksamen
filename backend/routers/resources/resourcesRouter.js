@@ -5,35 +5,12 @@ import * as availabilityQueries from "../../db/queries/availabilities.js";
 import * as bookingQueries from "../../db/queries/bookings.js";
 import * as typeQueries from "../../db/queries/types.js";
 import { isLoggedIn } from "../../middleware/authMiddleware.js";
+import { allowSelfOrAdmin } from "../../auth/authorization.js";
+import * as userQueries from "../../db/queries/users.js";
 import logger from "../../lib/logger.js";
-import fs from "fs";
-import path from "path";
+import { sendServerError, deleteUploadFile, datesBetween } from "../../lib/resourceUtils.js";
 
 const router = Router();
-
-const sendServerError = (res, tag, error) => {
-  logger.error(error, tag);
-  return res.status(500).json({ message: "Internal server error" });
-};
-
-const deleteUploadFile = (image) => {
-  if (!image || !String(image).includes("/uploads/")) return;
-  try {
-    const filename = String(image).split("/uploads/").pop();
-    const uploadPath = path.resolve("./Frontend/public/uploads", filename);
-    if (fs.existsSync(uploadPath)) fs.unlinkSync(uploadPath);
-  } catch (error) {
-    logger.debug("Failed removing upload file", error);
-  }
-};
-
-const emit = (ev, payload) => {
-  try {
-    global.io?.emit?.(ev, payload);
-  } catch (error) {
-    logger.warn(`Emit ${ev} failed`, error);
-  }
-};
 
 router.get("/api/resources", isLoggedIn, async (req, res) => {
   try {
@@ -44,12 +21,16 @@ router.get("/api/resources", isLoggedIn, async (req, res) => {
   }
 });
 
-router.get("/api/resources/mine", isLoggedIn, async (req, res) => {
+router.get("/api/users/:id/resources", isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
   try {
-    const result = await db.query(queries.getOwnedResources, [req.user.username]);
+    const id = req.params.id;
+    const userRow = await db.query(userQueries.selectUserById, [id]);
+    if (!userRow.rowCount) return res.status(404).json({ message: "User not found" });
+    const username = userRow.rows[0].username;
+    const result = await db.query(queries.getOwnedResources, [username]);
     return res.status(200).json(result.rows);
   } catch (error) {
-    return sendServerError(res, "GET /api/resources/mine error", error);
+    return sendServerError(res, "GET /api/users/:id/resources error", error);
   }
 });
 
@@ -62,9 +43,9 @@ router.post("/api/resources", isLoggedIn, async (req, res) => {
     let typeName = type;
     if (typeof type === "number" || /^\d+$/.test(String(type))) {
       const typeId = Number(type);
-      const t = await db.query(typeQueries.selectTypeNameById, [typeId]);
-      if (!t.rowCount) return res.status(400).json({ message: "Invalid type id" });
-      typeName = t.rows[0].name;
+      const selectedType = await db.query(typeQueries.selectTypeNameById, [typeId]);
+      if (!selectedType.rowCount) return res.status(400).json({ message: "Invalid type id" });
+      typeName = selectedType.rows[0].name;
     }
 
     const result = await db.query(queries.insertResource, [name, typeName, owner]);
@@ -77,27 +58,16 @@ router.post("/api/resources", isLoggedIn, async (req, res) => {
         logger.debug("Could not save image URL", error);
       }
     }
-    emit("resource:created", { id: insertId, name, type: typeName, owner });
+    try {
+      global.io?.emit?.("resource:created", { id: insertId, name, type: typeName, owner });
+    } catch (error) {
+      logger.warn("Emit resource:created failed", error);
+    }
     return res.status(201).json({ message: "Resource created", id: insertId });
   } catch (error) {
     return sendServerError(res, "POST /api/resources error", error);
   }
 });
-
-const datesBetween = (startString, endString) => {
-  const out = [];
-  const [startYear, startMonth, startDay] = String(startString).split("-").map(Number);
-  const [endYear, endMonth, endDay] = String(endString).split("-").map(Number);
-  const start = new Date(startYear, (startMonth || 1) - 1, startDay || 1);
-  const end = new Date(endYear, (endMonth || 1) - 1, endDay || 1);
-  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    out.push(`${year}-${month}-${day}`);
-  }
-  return out;
-};
 
 router.get("/api/resources/:id/availabilities", isLoggedIn, async (req, res) => {
   try {
@@ -141,14 +111,14 @@ router.delete("/api/resources/:id/availabilities/:availabilityId", isLoggedIn, a
     const availableRes = await db.query(availabilityQueries.selectAvailabilityById, [availabilityId]);
     if (!availableRes.rowCount || !availableRes.rows[0]) return res.status(404).json({ message: "Availability not found" });
     const available = availableRes.rows[0];
-    if (String(available.resource_id) !== String(resourceId)) return res.status(400).json({ message: "Availability does not belong to this resource" });
+    if (String(available.resourceId) !== String(resourceId)) return res.status(400).json({ message: "Availability does not belong to this resource" });
 
     const ownerCheck = await db.query(queries.selectResourceOwner, [resourceId]);
     if (!ownerCheck.rowCount) return res.status(404).json({ message: "Resource not found" });
     if (ownerCheck.rows[0].owner !== req.user?.username) return res.status(403).json({ message: "Forbidden: you are not the owner of this resource" });
 
-    const start = available.start_date || available.startDate;
-    const end = available.end_date || available.endDate;
+    const start = available.startDate;
+    const end = available.endDate;
     const conflict = await db.query(bookingQueries.checkConfirmedBookingConflict, [resourceId, start, end]);
     if (conflict?.rowCount > 0) return res.status(409).json({ message: "Cannot delete availability while confirmed bookings exist in that period" });
 
@@ -176,12 +146,24 @@ router.delete("/api/resources/:id", isLoggedIn, async (req, res) => {
     const imageRow = await db.query(queries.selectResourceImage, [id]).catch(() => ({ rows: [] }));
     const resourceImage = imageRow.rows?.[0]?.image;
 
-    await db.query(queries.deleteBookingsByResource, [id]).catch(() => {});
-    await db.query(queries.deleteAvailabilitiesByResource, [id]).catch(() => {});
-    await db.query(queries.deleteResource, [id]);
+    try {
+      await db.query("START TRANSACTION");
+      await db.query(queries.deleteBookingsByResource, [id]).catch(() => {});
+      await db.query(queries.deleteAvailabilitiesByResource, [id]).catch(() => {});
+      await db.query(queries.deleteResource, [id]);
+      await db.query("COMMIT");
+    } catch (transactionError) {
+      logger.error(transactionError, "Transaction error during resource delete, rolling back");
+      await db.query("ROLLBACK").catch(() => {});
+      throw transactionError;
+    }
 
     deleteUploadFile(resourceImage);
-    emit("resource:deleted", { id });
+    try {
+      global.io?.emit?.("resource:deleted", { id });
+    } catch (error) {
+      logger.warn("Emit resource:deleted failed", error);
+    }
     return res.status(200).json({ message: "Resource deleted" });
   } catch (error) {
     return sendServerError(res, "DELETE /api/resources/:id error", error);

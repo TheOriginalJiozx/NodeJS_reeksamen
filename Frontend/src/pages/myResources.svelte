@@ -2,12 +2,10 @@
   import { onMount, onDestroy } from "svelte";
   import { navigate } from "../lib/router.js";
   import apiFetch from "../lib/api.js";
-  import notifier from "../lib/notifier.js";
-  import { removeNotificationsByBookingId } from "../store/notificationsStore.js";
-  import BookingList from "../components/bookingList.svelte";
-  import ResourceImages from "../components/resourceImages.svelte";
-  import { fetchAvailability } from "../fetcher/bookingFetchers.js";
-  import { handleDeleteAvailability } from "../handler/bookingHandlers.js";
+  import logger from "../lib/logger.js";
+  import ResourceTable from "../components/resourceTable.svelte";
+  import { initializeResourceSocket, disconnectSocket } from "../lib/socketUtils.js";
+  import { confirmBooking, declineBooking, deleteResource, deleteAvailability, loadResourcesWithBookingsAndAvailability } from "../handler/resourceHandlers.js";
 
   let loading = true;
   let user = null;
@@ -23,7 +21,7 @@
   function openPreviewFromResource(resource, image) {
     previewImages = String(resource.image).split(";").filter(Boolean);
     previewIndex = Math.max(0, previewImages.indexOf(image));
-    previewImage = previewImages[previewIndex] || null;
+    previewImage = previewImages[previewIndex];
   }
 
   function onPreviewKey(event) {
@@ -34,84 +32,42 @@
     previewImage = previewImages[previewIndex];
   }
 
+  async function fetchResources() {
+    const { resources: res, resourceBookings: newBookings, resourceAvailabilities: newAvailabilities } = await loadResourcesWithBookingsAndAvailability(user?.id);
+    resources = res;
+    resourceBookings = newBookings;
+    resourceAvailabilities = newAvailabilities;
+  }
+
+  async function handleConfirmBooking(bookingId) {
+    if (await confirmBooking(bookingId)) {
+      await fetchResources();
+    }
+  }
+
+  async function handleDeclineBooking(bookingId) {
+    if (await declineBooking(bookingId)) {
+      await fetchResources();
+    }
+  }
+
+  async function handleDeleteResource(id) {
+    const res = await deleteResource(id);
+    if (res.ok) {
+      resources = resources.filter((resource) => String(resource.id) !== String(id));
+    } else {
+      error = res.message;
+    }
+  }
+
   onMount(() => {
     window.addEventListener("keydown", onPreviewKey);
     return () => window.removeEventListener("keydown", onPreviewKey);
   });
 
   onDestroy(() => {
-    if (socket?.disconnect) socket.disconnect();
+    disconnectSocket(socket);
   });
-
-  async function fetchBookingsFor(resourceID) {
-    try {
-      const res = await apiFetch(`/api/bookings?resourceID=${resourceID}`, { credentials: "include" });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data.bookings) ? data.bookings : data.bookings || [];
-    } catch {
-      return [];
-    }
-  }
-
-  async function fetchResources() {
-    const res = await apiFetch("/api/resources/mine", { credentials: "include" });
-    if (!res.ok) return;
-    resources = await res.json();
-    const bookingsList = await Promise.all(resources.map((resource) => fetchBookingsFor(resource.id)));
-    const availableList = await Promise.all(resources.map((resource) => fetchAvailability(resource.id)));
-    resourceBookings = {};
-    resourceAvailabilities = {};
-    resources.forEach((resource, index) => {
-      resourceBookings[String(resource.id)] = bookingsList[index] || [];
-      resourceAvailabilities[String(resource.id)] = (availableList[index] && availableList[index].availability) || [];
-    });
-  }
-
-  async function confirmBooking(bookingId, resourceID) {
-    const res = await apiFetch(`/api/bookings/${bookingId}/confirm`, { method: "PATCH" });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.message || "Failed to confirm booking");
-      return;
-    }
-    resourceBookings[String(resourceID)] = await fetchBookingsFor(resourceID);
-    removeNotificationsByBookingId(bookingId);
-    notifier?.success?.("Booking confirmed");
-  }
-
-  async function declineBooking(bookingId, resourceID) {
-    if (!confirm("Decline this booking request?")) return;
-    const res = await apiFetch(`/api/bookings/${bookingId}`, { method: "DELETE" });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.message || "Failed to decline booking");
-      return;
-    }
-    resourceBookings[String(resourceID)] = await fetchBookingsFor(resourceID);
-    removeNotificationsByBookingId(bookingId);
-    notifier?.success?.("Booking declined");
-  }
-
-  async function deleteResource(id) {
-    if (!confirm("Delete this resource? This cannot be undone.")) return;
-    const res = await apiFetch(`/api/resources/${id}`, { method: "DELETE" });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      error = json.message || "Failed to delete resource";
-      return;
-    }
-    resources = resources.filter((r) => String(r.id) !== String(id));
-  }
-
-  async function deleteAvailabilityForResource(resourceId, availabilityId) {
-    if (!confirm("Delete this availability?")) return;
-    const res = await handleDeleteAvailability(resourceId, availabilityId);
-    if (res && res.ok) {
-      resourceAvailabilities[String(resourceId)] = (await fetchAvailability(resourceId)).availability || [];
-      notifier?.success?.("Availability deleted");
-    }
-  }
 
   onMount(async () => {
     try {
@@ -124,11 +80,7 @@
       await fetchResources();
 
       const socketUrl = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
-      if (typeof globalThis.io === "function") {
-        socket = globalThis.io(socketUrl, { withCredentials: true });
-        ["resource:created","resource:deleted","availability:changed","booking:created","booking:deleted","booking:confirmed","booking:declined"].forEach((ev) => socket.on(ev, fetchResources));
-        if (user?.username) socket.emit("joinUser", { username: user.username });
-      }
+      socket = initializeResourceSocket(socketUrl, user?.username, fetchResources);
     } catch (error) {
       logger.error("Failed to fetch user or resources", error && error.message ? error.message : error);
     } finally {
@@ -153,50 +105,16 @@
         {:else if resources.length === 0}
           <div class="text-gray-600">You have no resources.</div>
         {:else}
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="text-sm text-gray-600 border-b">
-                <th class="py-2">Name</th>
-                <th class="py-2">Type</th>
-                <th class="py-2">Image(s)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each resources as resource}
-                <tr class="align-top border-b">
-                  <td class="py-2">{resource.name}</td>
-                  <td class="py-2">{resource.type}</td>
-                  <td class="py-2">
-                    <ResourceImages imagesString={resource.image} {resource} open={openPreviewFromResource} />
-                  </td>
-                  <td class="py-2">
-                    <button class="bg-red-600 text-white px-2 py-1 rounded" on:click={() => deleteResource(resource.id)}>Delete</button>
-                  </td>
-                </tr>
-                <tr>
-                  <td colspan="4" class="bg-gray-50 px-4 py-2">
-                        <div class="text-sm font-semibold mb-2">Availabilities</div>
-                        {#if Array.isArray(resourceAvailabilities[String(resource.id)]) && resourceAvailabilities[String(resource.id)].length > 0}
-                          <ul class="text-sm space-y-1 mb-3">
-                            {#each resourceAvailabilities[String(resource.id)] as a}
-                              <li class="flex items-center justify-between">
-                                <div>{a.startDate || a.start_date} — {a.endDate || a.end_date}</div>
-                                <div>
-                                  <button class="bg-red-600 text-white px-2 py-1 rounded" on:click={() => deleteAvailabilityForResource(resource.id, a.id || a.ID || a.insertId)}>Delete</button>
-                                </div>
-                              </li>
-                            {/each}
-                          </ul>
-                        {:else}
-                          <div class="text-xs text-gray-600 mb-3">No availabilities</div>
-                        {/if}
-                        <div class="text-sm font-semibold mb-2">Bookings</div>
-                        <BookingList bookings={resourceBookings[String(resource.id)]} resourceID={resource.id} confirm={confirmBooking} decline={declineBooking} />
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
+          <ResourceTable
+            {resources}
+            {resourceBookings}
+            {resourceAvailabilities}
+            onPreview={openPreviewFromResource}
+            onDeleteResource={handleDeleteResource}
+            onConfirmBooking={handleConfirmBooking}
+            onDeclineBooking={handleDeclineBooking}
+            onDeleteAvailability={deleteAvailability}
+          />
         {/if}
       </section>
     </div>

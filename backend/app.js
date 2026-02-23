@@ -10,7 +10,9 @@ import { Server } from "socket.io";
 import http from "http";
 import authRouter from "./routers/users/authRouter.js";
 import usersRouter from "./routers/users/usersRouter.js";
+import usersExportRouter from "./routers/users/usersExportRouter.js";
 import bookingsRouter from "./routers/bookings/bookingsRouter.js";
+import bookingsActionsRouter from "./routers/bookings/bookingsActionsRouter.js";
 import resourcesRouter from "./routers/resources/resourcesRouter.js";
 import typesRouter from "./routers/types/typesRouter.js";
 import uploadsRouter from "./routers/uploads/uploadsRouter.js";
@@ -83,7 +85,9 @@ app.get("/api/csrf-token", (req, res) => {
 
 app.use(authRouter);
 app.use(usersRouter);
+app.use(usersExportRouter);
 app.use(bookingsRouter);
+app.use(bookingsActionsRouter);
 app.use(resourcesRouter);
 app.use(typesRouter);
 app.use(uploadsRouter);

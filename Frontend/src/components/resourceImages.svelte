@@ -1,10 +1,10 @@
 <script>
   export let imagesString = "";
   export let resource = {};
-  export let open = (r, img) => {};
+  export let open = () => {};
 
-  function getImages(s) {
-    return String(s || "").split(";").filter(Boolean);
+  function getImages(imageString) {
+    return String(imageString || "").split(";").filter(Boolean);
   }
 </script>
 

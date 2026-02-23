@@ -2,7 +2,8 @@
   import { onMount, onDestroy } from "svelte";
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
-  import { fetchOwnedResources, fetchAvailability } from "../fetcher/bookingFetchers.js";
+  import { fetchAvailability } from "../fetcher/bookingFetchers.js";
+  import apiFetch from "../lib/api.js";
   import { handleAddAvailability } from "../handler/bookingHandlers.js";
   import notifier from "../lib/notifier.js";
   import { today, contiguousEndDates } from "../util/bookingUtils.js";
@@ -69,7 +70,17 @@
   }
 
   onMount(async () => {
-    resourcesOwned = await fetchOwnedResources();
+    try {
+      const cached = localStorage.getItem("user");
+      const parsed = cached ? JSON.parse(cached) : null;
+      const userId = parsed?.id;
+      if (userId) {
+        const res = await apiFetch(`/api/users/${userId}/resources`);
+        if (res.ok) resourcesOwned = await res.json();
+      }
+    } catch (error) {
+      logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
+    }
     if (resourcesOwned.length && !available.resourceId) available.resourceId = resourcesOwned[0].id;
     if (available.resourceId) await load(available.resourceId);
 
@@ -92,12 +103,32 @@
       if (typeof globalThis.io === "function") {
         socket = globalThis.io(socketUrl, { withCredentials: true });
         socket.on("resource:created", async () => {
-          resourcesOwned = await fetchOwnedResources();
+          try {
+            const cached = localStorage.getItem("user");
+            const parsed = cached ? JSON.parse(cached) : null;
+            const userId = parsed?.id;
+            if (userId) {
+              const res = await apiFetch(`/api/users/${userId}/resources`);
+              if (res.ok) resourcesOwned = await res.json();
+            }
+          } catch (error) {
+            logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
+          }
           if (resourcesOwned.length && !available.resourceId) available.resourceId = resourcesOwned[0].id;
           if (available.resourceId) await load(available.resourceId);
         });
         socket.on("resource:deleted", async () => {
-          resourcesOwned = await fetchOwnedResources();
+          try {
+            const cached = localStorage.getItem("user");
+            const parsed = cached ? JSON.parse(cached) : null;
+            const userId = parsed?.id;
+            if (userId) {
+              const res = await apiFetch(`/api/users/${userId}/resources`);
+              if (res.ok) resourcesOwned = await res.json();
+            }
+          } catch (error) {
+            logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
+          }
           if (resourcesOwned.length && !available.resourceId) available.resourceId = resourcesOwned[0].id;
           if (available.resourceId) await load(available.resourceId);
         });
