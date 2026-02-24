@@ -1,7 +1,7 @@
 export const findUserByEmail = `SELECT * FROM users WHERE email = ?`;
 export const findUserByUsername = `SELECT * FROM users WHERE username = ?`;
 export const findReservedUsername = `SELECT username FROM reserved_usernames WHERE username = ?`;
-export const selectUserById = `SELECT id, fullname, username, email, role FROM users WHERE id = ?`;
+export const selectUserById = `SELECT * FROM users WHERE id = ? LIMIT 1`;
 export const insertUser = `INSERT INTO users (fullname, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)`;
 export const deleteUserById = `DELETE FROM users WHERE id = ?`;
 export const reserveUsername = `INSERT INTO reserved_usernames (username) VALUES (?)`;

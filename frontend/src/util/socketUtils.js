@@ -1,4 +1,4 @@
-import logger from "./logger.js";
+import logger from "../lib/logger.js";
 
 export function initializeResourceSocket(backendOrigin, username, onEventFired) {
   try {

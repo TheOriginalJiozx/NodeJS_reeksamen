@@ -8,7 +8,7 @@ import { isLoggedIn } from "../../middleware/authMiddleware.js";
 import { allowSelfOrAdmin } from "../../auth/authorization.js";
 import * as userQueries from "../../db/queries/users.js";
 import logger from "../../lib/logger.js";
-import { sendServerError, deleteUploadFile, datesBetween } from "../../lib/resourceUtils.js";
+import { sendServerError, deleteUploadFile, datesBetween } from "../../utils/resourceUtils.js";
 
 const router = Router();
 
@@ -48,16 +48,27 @@ router.post("/api/resources", isLoggedIn, async (req, res) => {
       typeName = selectedType.rows[0].name;
     }
 
-    const result = await db.query(queries.insertResource, [name, typeName, owner]);
-    const insertId = result.rows?.insertId ?? null;
     const imageUrl = req.body?.imageUrl ?? null;
-    if (insertId && imageUrl) {
-      try {
+    let insertId = null;
+
+    try {
+      await db.query("START TRANSACTION");
+      const result = await db.query(queries.insertResource, [name, typeName, owner]);
+      insertId = result.rows?.insertId ?? null;
+      
+      if (insertId && imageUrl) {
         await db.query(queries.updateResourceImage, [imageUrl, insertId]);
-      } catch (error) {
-        logger.debug("Could not save image URL", error);
       }
+      await db.query("COMMIT");
+    } catch (transactionError) {
+      try {
+        await db.query("ROLLBACK");
+      } catch (rollbackError) {
+        logger.error(rollbackError, "POST /api/resources rollback error");
+      }
+      throw transactionError;
     }
+
     try {
       global.io?.emit?.("resource:created", { id: insertId, name, type: typeName, owner });
     } catch (error) {
@@ -90,8 +101,22 @@ router.post("/api/resources/:id/availabilities", isLoggedIn, async (req, res) =>
     const ownerCheck = await db.query(queries.selectResourceOwner, [id]);
     if (!ownerCheck.rowCount) return res.status(404).json({ message: "Resource not found" });
     if (ownerCheck.rows[0].owner !== req.user?.username) return res.status(403).json({ message: "Forbidden: you are not the owner of this resource" });
-    const result = await db.query(queries.insertAvailability, [id, startDate, endDate]);
-    const insertId = result.rows?.[0]?.insertId ?? null;
+    
+    let insertId = null;
+    try {
+      await db.query("START TRANSACTION");
+      const result = await db.query(queries.insertAvailability, [id, startDate, endDate]);
+      insertId = result.rows?.[0]?.insertId ?? null;
+      await db.query("COMMIT");
+    } catch (transactionError) {
+      try {
+        await db.query("ROLLBACK");
+      } catch (rollbackError) {
+        logger.error(rollbackError, "POST /api/resources/:id/availabilities rollback error");
+      }
+      throw transactionError;
+    }
+
     try {
       global.io?.to?.(`resource:${id}`)?.emit?.("availability:changed", { resourceId: id, startDate, endDate, id: insertId });
     } catch (error) {
@@ -122,7 +147,18 @@ router.delete("/api/resources/:id/availabilities/:availabilityId", isLoggedIn, a
     const conflict = await db.query(bookingQueries.checkConfirmedBookingConflict, [resourceId, start, end]);
     if (conflict?.rowCount > 0) return res.status(409).json({ message: "Cannot delete availability while confirmed bookings exist in that period" });
 
-    await db.query(availabilityQueries.deleteAvailabilityById, [availabilityId]);
+    try {
+      await db.query("START TRANSACTION");
+      await db.query(availabilityQueries.deleteAvailabilityById, [availabilityId]);
+      await db.query("COMMIT");
+    } catch (transactionError) {
+      try {
+        await db.query("ROLLBACK");
+      } catch (rollbackError) {
+        logger.error(rollbackError, "DELETE /api/resources/:id/availabilities/:availabilityId rollback error");
+      }
+      throw transactionError;
+    }
 
     try {
       global.io?.to(`resource:${resourceId}`)?.emit?.("availability:changed", { resourceId });

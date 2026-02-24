@@ -5,6 +5,7 @@ import * as resourceQueries from "../../db/queries/resources.js";
 import { rateLimit } from "express-rate-limit";
 import { isLoggedIn } from "../../middleware/authMiddleware.js";
 import logger from "../../lib/logger.js";
+import { datesBetween } from "../../utils/dateUtils.js";
 
 const router = Router();
 
@@ -42,19 +43,6 @@ router.post("/api/bookings", authLimiter, isLoggedIn, async (req, res) => {
     return res.status(400).json({ message: "Missing required booking fields" });
   }
 
-  const datesBetween = (start, end) => {
-    const array = [];
-    const startDateObject = new Date(start);
-    const endDateObject = new Date(end);
-    for (let date = new Date(startDateObject); date <= endDateObject; date.setDate(date.getDate() + 1)) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      array.push(`${year}-${month}-${day}`);
-    }
-    return array;
-  };
-
   try {
     const dates = datesBetween(startDate, endDate);
 
@@ -77,31 +65,39 @@ router.post("/api/bookings", authLimiter, isLoggedIn, async (req, res) => {
       return res.status(409).json({ message: "Requested date range conflicts with existing confirmed booking" });
     }
 
-    const insert = await db.query(queries.insertBooking, [booker, resourceId, startDate, endDate, comment]);
-
-    const insertId = insert.rows && insert.rows.insertId ? insert.rows.insertId : null;
-
+    let insertId = null;
     let resourceImage = null;
-    try {
-      const image = await db.query(queries.selectImageForResource, [resourceId]);
-      if (image.rowCount && image.rows[0] && image.rows[0].image)
-        resourceImage = image.rows[0].image;
-    } catch (error) {
-      logger.debug(
-        "Could not fetch resource image for booking",
-        error && error.message ? error.message : error,
-      );
-    }
 
-    if (insertId) {
+    try {
+      await db.query("START TRANSACTION");
+      
+      const insert = await db.query(queries.insertBooking, [booker, resourceId, startDate, endDate, comment]);
+      insertId = insert.rows && insert.rows.insertId ? insert.rows.insertId : null;
+
       try {
-        await db.query(queries.updateBookingImage, [resourceImage, insertId]);
+        const image = await db.query(queries.selectImageForResource, [resourceId]);
+        if (image.rowCount && image.rows[0] && image.rows[0].image)
+          resourceImage = image.rows[0].image;
       } catch (error) {
-        logger.debug(
-          "Could not save image URL to bookings table (column may be missing)",
-          error && error.message ? error.message : error,
-        );
+        logger.debug("Could not fetch resource image for booking", error && error.message ? error.message : error);
       }
+
+      if (insertId && resourceImage) {
+        try {
+          await db.query(queries.updateBookingImage, [resourceImage, insertId]);
+        } catch (error) {
+          logger.debug("Could not save image URL to bookings table", error && error.message ? error.message : error);
+        }
+      }
+
+      await db.query("COMMIT");
+    } catch (transactionError) {
+      try {
+        await db.query("ROLLBACK");
+      } catch (rollbackError) {
+        logger.error(rollbackError, "POST /api/bookings rollback error");
+      }
+      throw transactionError;
     }
 
     try {

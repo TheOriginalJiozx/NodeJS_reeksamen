@@ -8,7 +8,7 @@ import logger from "../../lib/logger.js";
 import fs from "fs";
 import path from "path";
 import auth from "../../utils/authorizerUtils.js";
-import { collectSessionIdsForUsername, destroySessionIds } from "../../lib/sessionUtils.js";
+import { collectSessionIdsForUsername, destroySessionIds } from "../../utils/sessionUtils.js";
 
 const router = Router();
 const API = "/api";
@@ -128,7 +128,7 @@ router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res
         } catch (rollbackError) {
           logger.error(rollbackError, "Failed rollback after username update error");
         }
-        return sendServerError(res, "PATCH /api/users/:id username tx error", transactionError);
+        return sendServerError(res, "PATCH /api/users/:id username transaction error", transactionError);
       }
 
       try {

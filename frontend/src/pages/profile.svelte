@@ -7,10 +7,11 @@
   import { isAdmin } from "../lib/authorization.js";
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
+  import { loadAuthenticatedUser, clearUserCache } from "../lib/authUtils.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../lib/responseUtils.js";
 
   let user = null;
   let loading = true;
-  let message = "";
   let deleting = false;
   let exporting = false;
 
@@ -26,34 +27,23 @@
       }
 
       const res = await apiFetch(`/api/users/${targetId}`, { method: "DELETE" });
-      const content = res.headers.get("content-type") || "";
-      let data = {};
-      if (content.includes("application/json")) data = await res.json();
-      else data = { message: await res.text() };
+      const data = await parseResponse(res);
 
       if (res.ok) {
-        try {
-          localStorage.removeItem("user");
-        } catch (error) {
-          logger.error("Failed to remove user from localStorage", error && error.message ? error.message : error);
-        }
+        clearUserCache();
         try {
           clearAuth();
         } catch (error) {}
-        notifier.success(data.message || "Account deleted");
+        notifier.success(getSuccessMessage(data, "Account deleted"));
         navigate("/");
         return;
       }
 
-      if (res.status === 409) {
-        notifier.error(data.message || "Cannot delete account while active bookings exist");
-      } else if (res.status === 403) {
-        notifier.error(data.message || "You are not allowed to delete this account");
-      } else {
-        notifier.error(data.message || "Failed to delete account");
-      }
+      const errorMessage = getErrorMessage(data, "Failed to delete account");
+      notifier.error(errorMessage);
     } catch (error) {
       notifier.error("Failed to delete account");
+      logger.error("Delete account error", error && error.message ? error.message : error);
     } finally {
       deleting = false;
     }
@@ -63,22 +53,17 @@
     if (!confirm("Export your data to a JSON file?")) return;
     exporting = true;
     try {
-      const apiFetch = (await import("../lib/api.js")).default;
-      const res = await apiFetch("/api/users/export", { method: "POST" });
+      const res = await apiFetch("/api/users/export", { method: "GET" });
       if (!res.ok) {
-        let error = {};
-        try {
-          error = await res.json();
-        } catch (error) {
-          logger.error("Failed to parse export error response", error && error.message ? error.message : error);
-        }
-        notifier.error(error.message || "Export failed");
+        const error = await parseResponse(res);
+        notifier.error(getErrorMessage(error, "Export failed"));
         return;
       }
 
       const blob = await res.blob();
       const disposition = res.headers.get("content-disposition") || "";
-      let filename = "user-data.json";
+      const username = user?.username || "user";
+      let filename = `${username}-data.json`;
       const match = /filename=\"?([^\";]+)\"?/.exec(disposition);
       if (match && match[1]) filename = match[1];
 
@@ -92,7 +77,7 @@
       URL.revokeObjectURL(url);
       notifier.success("Export complete");
     } catch (error) {
-      logger.error(error, "Export failed");
+      logger.error("Export error", error && error.message ? error.message : error);
       notifier.error("Export failed");
     } finally {
       exporting = false;
@@ -101,36 +86,30 @@
 
   onMount(async () => {
     try {
-      const cached = localStorage.getItem("user");
-      let parsed = null;
-      try {
-        parsed = cached ? JSON.parse(cached) : null;
-      } catch (error) {
-        parsed = null;
-      }
-      if (!parsed || !parsed.id) {
+      const parsed = loadAuthenticatedUser();
+      if (!parsed) {
         navigate("/login");
         return;
       }
 
       const res = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
       if (res.status === 401) {
+        notifier.error("Session expired. Please log in again.");
         navigate("/login");
         return;
       }
 
-      let data = {};
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        data = { message: text };
+      if (!res.ok) {
+        notifier.error("Failed to load profile");
+        logger.error("Failed to fetch user profile", `Status: ${res.status}`);
+        return;
       }
 
+      const data = await parseResponse(res);
       user = data.user || null;
     } catch (error) {
-      message = "Could not load profile.";
+      notifier.error("Failed to load profile");
+      logger.error("Profile fetch error", error && error.message ? error.message : error);
     } finally {
       loading = false;
     }
@@ -166,7 +145,7 @@
             </button>
           </div>
         {:else}
-          <div class="text-red-600">{message}</div>
+          <div class="text-gray-600">Unable to load profile</div>
         {/if}
       </section>
     </div>

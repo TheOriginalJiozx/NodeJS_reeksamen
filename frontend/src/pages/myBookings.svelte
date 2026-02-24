@@ -4,6 +4,7 @@
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
   import notifier from "../lib/notifier.js";
+  import { loadAuthenticatedUser } from "../lib/authUtils.js";
   import ImagePreview from "../components/resources/imagePreview.svelte";
   import BookingRow from "../components/bookings/bookingRow.svelte";
 
@@ -27,25 +28,23 @@
   async function fetchBookings() {
     try {
       const res = await apiFetch("/api/bookings", { credentials: "include" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        notifier.error("Failed to load bookings");
+        return;
+      }
       const data = await res.json();
       bookings = Array.isArray(data.bookings) ? data.bookings : data.bookings || [];
       if (user && user.username) bookings = bookings.filter((bookings) => String(bookings.booker) === String(user.username));
       bookings.sort((left, right) => new Date(left.startDate) - new Date(right.startDate));
     } catch (error) {
-      logger.error("Failed to fetch bookings");
+      notifier.error("Failed to load bookings");
+      logger.error("Error fetching bookings", error && error.message ? error.message : error);
     }
   }
 
   onMount(async () => {
     try {
-      const cached = localStorage.getItem("user");
-      let parsed = null;
-      try {
-        parsed = cached ? JSON.parse(cached) : null;
-      } catch {
-        parsed = null;
-      }
+      const parsed = loadAuthenticatedUser();
       if (!parsed || !parsed.id) {
         navigate("/login");
         return;
@@ -57,17 +56,26 @@
       }
       const meData = await me.json();
       user = meData.user || null;
-
+      // spørgsmål: hvorfor bruger vi Promise.all her?
+      // Vi bruger Promise.all her for at køre flere asynkrone operationer parallelt og vente på, at de alle er færdige.
+      // I dette tilfælde vil vi gerne hente både bookinger og ressourcer samtidig,
+      // og ved at bruge Promise.all kan vi starte begge forespørgsler på samme tid,
+      // hvilket kan være hurtigere end at vente på den første, før vi starter den anden.
       await Promise.all([
         fetchBookings(),
         (async () => {
           try {
             const res = await apiFetch("/api/resources", { credentials: "include" });
-            resources = res.ok ? await res.json() : [];
+            if (!res.ok) {
+              notifier.error("Failed to load resources");
+              return;
+            }
+            resources = await res.json();
             resourceMap = {};
             for (const resource of resources) resourceMap[String(resource.id)] = resource;
           } catch (error) {
-            logger.error("Failed to fetch resources");
+            notifier.error("Failed to load resources");
+            logger.error("Failed to fetch resources", error && error.message ? error.message : error);
           }
         })(),
       ]);

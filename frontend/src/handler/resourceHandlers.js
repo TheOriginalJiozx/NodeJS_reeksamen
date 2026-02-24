@@ -23,7 +23,12 @@ export async function loadResourcesWithBookingsAndAvailability(userId) {
     const res = await apiFetch(`/api/users/${userId}/resources`);
     if (!res.ok) return { resources: [], resourceBookings: {}, resourceAvailabilities: {} };
     const resources = await res.json();
-
+    // spørgsmål: hvorfor bruger vi Promise.all her?
+    // Vi bruger Promise.all her for at køre flere asynkrone operationer parallelt og vente på,
+    // at de alle er færdige.
+    // I dette tilfælde vil vi gerne hente både bookinger og tilgængeligheder for alle ressourcer samtidig,
+    // og ved at bruge Promise.all kan vi starte alle forespørgslerne på samme tid,
+    // hvilket kan være hurtigere end at vente på den første, før vi starter den anden.
     const bookingsList = await Promise.all(resources.map((resource) => fetchBookingsFor(resource.id)));
     const availableList = await Promise.all(resources.map((resource) => fetchAvailability(resource.id)));
     const resourceBookings = {};

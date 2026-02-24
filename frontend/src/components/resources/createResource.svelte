@@ -6,6 +6,7 @@
   import ImageUploader from "./imageUploader.svelte";
   import { handleCreate } from "../../handler/bookingHandlers.js";
   import logger from "../../lib/logger.js";
+  import { getCachedUser } from "../../lib/authUtils.js";
 
   let types = [];
   let create = { name: "", type: "" };
@@ -34,14 +35,15 @@
         logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
       }
       try {
-        const cached = localStorage.getItem("user");
-        const parsed = cached ? JSON.parse(cached) : null;
-        const userId = parsed?.id;
+        const cached = getCachedUser();
+        const userId = cached?.id;
         if (userId) {
           const r = await apiFetch(`/api/users/${userId}/resources`);
           if (r.ok) resourcesOwned = await r.json();
+          else notifier.error("Failed to fetch your resources");
         }
       } catch (error) {
+        notifier.error("Failed to fetch your resources");
         logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
       }
     } catch (error) {
@@ -84,14 +86,15 @@
           logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
         }
         try {
-          const cached = localStorage.getItem("user");
-          const parsed = cached ? JSON.parse(cached) : null;
-          const userId = parsed?.id;
+          const cached = getCachedUser();
+          const userId = cached?.id;
           if (userId) {
             const resources = await apiFetch(`/api/users/${userId}/resources`);
             if (resources.ok) resourcesOwned = await resources.json();
+            else notifier.error("Failed to fetch your resources");
           }
         } catch (error) {
+          notifier.error("Failed to fetch your resources");
           logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
         }
       }

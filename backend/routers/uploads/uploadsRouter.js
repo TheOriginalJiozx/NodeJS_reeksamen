@@ -43,6 +43,10 @@ const upload = multer({
 });
 
 async function scanFileForViruses(filePath) {
+  // spørgsmål: hvorfor bruger vi Promise her?
+  // Vi bruger en Promise her for at gøre den callback-baserede spawn-metode kompatibel med async/await-syntaksen.
+  // spawn forventer, at vi håndterer output og afslutning gennem callbacks, men ved at indpakke det i en Promise kan vi bruge await for at vente på resultatet,
+  // hvilket gør koden mere læsbar og lettere at håndtere i tilfælde af fejl.
   return new Promise((resolve) => {
     try {
       const clamscan = spawn("clamscan", ["--quiet", filePath]);

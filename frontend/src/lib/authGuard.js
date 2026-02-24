@@ -5,28 +5,36 @@ import { protectedRoutes } from "./authorization.js";
 
 let currentUser = null;
 user.subscribe((user) => (currentUser = user));
-let started = false;
+let guardActive = false;
 
-ready.subscribe((isReady) => {
-  if (!isReady) return;
-  if (started) return;
-  started = true;
+function initializeRouteGuard() {
+  if (guardActive) return;
 
-  route.subscribe((routePath) => {
-    try {
-      if (!routePath) return;
-      const path = routePath.split("?")[0];
-      if (protectedRoutes.has(path)) {
-        if (!currentUser) {
-          navigate("/login");
-        }
-      }
-    } catch (error) {
-      logger.error("authGuard route subscription error",
-        error && error.message ? error.message : error,
-      );
-    }
+  ready.subscribe((isReady) => {
+    if (!isReady) return;
+    if (guardActive) return;
+    guardActive = true;
+
+    route.subscribe((routePath) => {
+      enforceRouteProtection(routePath);
+    });
   });
-});
+}
 
-export default { protectedRoutes };
+function enforceRouteProtection(routePath) {
+  try {
+    if (!routePath) return;
+    
+    const path = routePath.split("?")[0];
+    if (protectedRoutes.has(path) && !currentUser) {
+      logger.warn(`Unauthorized access attempt to ${path}`);
+      navigate("/login");
+    }
+  } catch (error) {
+    logger.error("authGuard route protection error", error && error.message ? error.message : error);
+  }
+}
+
+initializeRouteGuard();
+
+export { enforceRouteProtection };

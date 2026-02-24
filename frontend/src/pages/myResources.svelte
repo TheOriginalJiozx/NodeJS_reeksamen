@@ -2,9 +2,11 @@
   import { onMount, onDestroy } from "svelte";
   import { navigate } from "../lib/router.js";
   import apiFetch from "../lib/api.js";
+  import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
   import ResourceTable from "../components/resources/resourceTable.svelte";
-  import { initializeResourceSocket, disconnectSocket } from "../lib/socketUtils.js";
+  import { initializeSocket, disconnectSocket } from "../lib/socketManager.js";
+  import { loadAuthenticatedUser } from "../lib/authUtils.js";
   import { confirmBooking, declineBooking, deleteResource, deleteAvailability, loadResourcesWithBookingsAndAvailability } from "../handler/resourceHandlers.js";
 
   let loading = true;
@@ -12,7 +14,6 @@
   let resources = [];
   let resourceBookings = {};
   let resourceAvailabilities = {};
-  let error = null;
   let socket = null;
   let previewImage = null;
   let previewImages = [];
@@ -55,8 +56,9 @@
     const res = await deleteResource(id);
     if (res.ok) {
       resources = resources.filter((resource) => String(resource.id) !== String(id));
+      notifier.success("Resource deleted");
     } else {
-      error = res.message;
+      notifier.error(res.message || "Failed to delete resource");
     }
   }
 
@@ -71,8 +73,7 @@
 
   onMount(async () => {
     try {
-      const cached = localStorage.getItem("user");
-      const parsed = cached ? JSON.parse(cached) : null;
+      const parsed = loadAuthenticatedUser();
       if (!parsed?.id) return navigate("/login");
       const me = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
       if (me.status === 401) return navigate("/login");
@@ -80,8 +81,9 @@
       await fetchResources();
 
       const socketUrl = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
-      socket = initializeResourceSocket(socketUrl, user?.username, fetchResources);
+      socket = initializeSocket(socketUrl, user?.username, fetchResources);
     } catch (error) {
+      notifier.error("Failed to load resources");
       logger.error("Failed to fetch user or resources", error && error.message ? error.message : error);
     } finally {
       loading = false;
@@ -100,8 +102,6 @@
         </div>
         {#if loading}
           <div class="text-gray-600">Loading...</div>
-        {:else if error}
-          <div class="text-red-600">{error}</div>
         {:else if resources.length === 0}
           <div class="text-gray-600">You have no resources.</div>
         {:else}

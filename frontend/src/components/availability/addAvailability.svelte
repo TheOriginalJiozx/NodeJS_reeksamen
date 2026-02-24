@@ -8,6 +8,7 @@
   import notifier from "../../lib/notifier.js";
   import { today, contiguousEndDates } from "../../util/bookingUtils.js";
   import logger from "../../lib/logger.js";
+  import { getCachedUser } from "../../lib/authUtils.js";
 
   let resourcesOwned = [];
   let available = { resourceId: "", startDate: "", endDate: "" };
@@ -71,14 +72,15 @@
 
   onMount(async () => {
     try {
-      const cached = localStorage.getItem("user");
-      const parsed = cached ? JSON.parse(cached) : null;
-      const userId = parsed?.id;
+      const cached = getCachedUser();
+      const userId = cached?.id;
       if (userId) {
         const res = await apiFetch(`/api/users/${userId}/resources`);
         if (res.ok) resourcesOwned = await res.json();
+        else notifier.error("Failed to fetch your resources");
       }
     } catch (error) {
+      notifier.error("Failed to fetch your resources");
       logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
     }
     if (resourcesOwned.length && !available.resourceId) available.resourceId = resourcesOwned[0].id;
@@ -104,9 +106,8 @@
         socket = globalThis.io(socketUrl, { withCredentials: true });
         socket.on("resource:created", async () => {
           try {
-            const cached = localStorage.getItem("user");
-            const parsed = cached ? JSON.parse(cached) : null;
-            const userId = parsed?.id;
+            const cached = getCachedUser();
+            const userId = cached?.id;
             if (userId) {
               const res = await apiFetch(`/api/users/${userId}/resources`);
               if (res.ok) resourcesOwned = await res.json();
@@ -119,9 +120,8 @@
         });
         socket.on("resource:deleted", async () => {
           try {
-            const cached = localStorage.getItem("user");
-            const parsed = cached ? JSON.parse(cached) : null;
-            const userId = parsed?.id;
+            const cached = getCachedUser();
+            const userId = cached?.id;
             if (userId) {
               const res = await apiFetch(`/api/users/${userId}/resources`);
               if (res.ok) resourcesOwned = await res.json();

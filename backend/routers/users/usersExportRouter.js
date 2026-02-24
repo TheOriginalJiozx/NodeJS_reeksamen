@@ -15,7 +15,8 @@ const sendServerError = (res, tag, error) => {
   return res.status(500).json({ message: "Internal server error" });
 };
 
-router.post(`${API}/users/export`, isLoggedIn, async (req, res) => {
+// FRA POST TIL GET
+router.get(`${API}/users/export`, isLoggedIn, async (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(400).json({ message: "Invalid user" });
   try {
@@ -32,7 +33,7 @@ router.post(`${API}/users/export`, isLoggedIn, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     return res.status(200).send(payload);
   } catch (error) {
-    return sendServerError(res, "POST /api/users/export error", error);
+    return sendServerError(res, "GET /api/users/export error", error);
   }
 });
 

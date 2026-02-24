@@ -3,12 +3,13 @@
   import user from "../store/usersStore.js";
   import { navigate, route } from "../lib/router.js";
   import notifier from "../lib/notifier.js";
+  import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
   import { setAuth } from "../lib/authentication.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../lib/responseUtils.js";
 
   let username = "";
   let password = "";
-  let message = "";
 
   onMount(() => {
     if ($user) {
@@ -19,8 +20,6 @@
 
   async function submit(event) {
     event.preventDefault();
-    
-    message = "Logging in...";
 
     try {
       const res = await apiFetch("/api/auth/login", {
@@ -29,30 +28,25 @@
         body: JSON.stringify({ username, password }),
       });
 
-      let data = {};
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        data = { message: text };
-      }
+      const data = await parseResponse(res);
 
       if (!res.ok) {
-        message = data && data.message ? data.message : "Login failed";
+        const errorMessage = getErrorMessage(data, "Login failed");
+        notifier.error(errorMessage);
         return;
       }
 
-      message = data.message || "Login successful";
-      notifier.success("Successfully logged in");
+      const successMsg = getSuccessMessage(data, "Login successful");
+      notifier.success(successMsg);
       if (data.user) setAuth(data.user);
       username = "";
       password = "";
       navigate("/profile");
       route.set("/profile");
     } catch (error) {
-      message = "Network error. Please try again.";
-      notifier.error(error && error.message ? error.message : "Network error");
+      const errorMessage = error && error.message ? error.message : "Network error";
+      notifier.error(errorMessage);
+      logger.error("Login error", errorMessage);
     }
   }
 </script>
@@ -62,9 +56,6 @@
     <div class="p-8 md:p-12">
       <section class="max-w-md mx-auto mt-3 bg-white rounded shadow p-6">
         <h2 class="text-2xl font-semibold mb-4">Log in</h2>
-        {#if message}
-          <div class="mb-4 text-sm text-green-700">{message}</div>
-        {/if}
         <form on:submit={submit} class="space-y-4">
           <div>
             <label for="login-username" class="block text-sm mb-1">Username</label>

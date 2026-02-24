@@ -11,15 +11,22 @@ export function navigate(to) {
     return;
   }
 
-  history.pushState({}, "", to);
+  history.pushState({}, "", to); // spørgsmål - bruger pushState for at ændre URL uden at genindlæse siden
   route.set(to);
   try {
+    // spørgsmål
+    // Bruger PopStateEvent for at signalere ruteændring,
+    // da det er den mest semantiske måde at håndtere navigation på,
+    // og det sikrer kompatibilitet med browserens historikfunktioner
     window.dispatchEvent(new PopStateEvent("popstate"));
   } catch (error) {
     logger.info(
       "PopStateEvent not supported, using fallback",
       error && error.message ? error.message : error,
     );
+    // spørgsmål
+    // opretter en almindelig event, 
+    // da PopStateEvent måske ikke er understøttet i ældre browsere
     window.dispatchEvent(new Event("popstate"));
   }
 }

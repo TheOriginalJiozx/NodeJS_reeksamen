@@ -20,24 +20,35 @@ import initializeSocket from "./lib/socket.js";
 import csrfMiddleware from "./middleware/csrfMiddleware.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
-
-const app = express();
-
-const MySQLStore = expressMySQLSession(session);
-let sessionStore;
-try {
-  sessionStore = new MySQLStore(sessionOptions);
-  global.sessionStore = sessionStore;
-} catch (error) {
-  logger.warn("Could not initialize MySQL session store, falling back to MemoryStore:", error.message);
-  sessionStore = new session.MemoryStore();
-  global.sessionStore = sessionStore;
-}
+const NODE_ENV = process.env.NODE_ENV || "development";
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
   logger.error("Environment variable SESSION_SECRET is not set. Set SESSION_SECRET and restart the server.");
   process.exit(1);
+}
+
+if (!sessionOptions.host || !sessionOptions.user || !sessionOptions.database) {
+  logger.error("Database configuration incomplete. Check MYSQL_HOST, MYSQL_USER, and MYSQL_DATABASE environment variables.");
+  process.exit(1);
+}
+
+const app = express();
+
+const MySQLStore = expressMySQLSession(session);
+let sessionStore;
+
+try {
+  sessionStore = new MySQLStore(sessionOptions);
+  logger.info("MySQL session store initialized successfully");
+} catch (error) {
+  if (NODE_ENV === "production") {
+    logger.error(error, "CRITICAL: Could not initialize MySQL session store in production. Server cannot start.");
+    process.exit(1);
+  } else {
+    logger.warn("Could not initialize MySQL session store, falling back to MemoryStore for development:", error.message);
+    sessionStore = new session.MemoryStore();
+  }
 }
 
 app.use(express.json());
@@ -52,13 +63,14 @@ app.use(
 app.use(
   session({
     store: sessionStore,
-    secret: process.env.SESSION_SECRET,
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: NODE_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000,
     },
   }),
 );
@@ -92,6 +104,27 @@ app.use(resourcesRouter);
 app.use(typesRouter);
 app.use(uploadsRouter);
 
+app.use((req, res) => {
+  logger.warn(`404 Not Found: ${req.method} ${req.path}`);
+  return res.status(404).json({ message: "Endpoint not found" });
+});
+
+app.use((error, req, res, next) => {
+  if (error && error.code === "EBADCSRFTOKEN") {
+    logger.warn("Invalid CSRF token");
+    return res.status(403).json({ message: "Invalid CSRF token" });
+  }
+
+  logger.error(error, `Unhandled error in ${req.method} ${req.path}`);
+
+  const statusCode = error?.status || error?.statusCode || 500;
+  const message = error?.message || "Internal server error";
+
+  return res.status(statusCode).json({
+    message: statusCode === 500 ? "Internal server error" : message,
+  });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -100,20 +133,32 @@ const io = new Server(server, {
   },
 });
 
+// Kun brug global for io og sessionStore, da de skal bruges på tværs af routers og socket initialization kræver adgang til session store.
+// Disse kan ikke undgås uden større refactoring, da routers skal kunne emit events og socket initialization skal have adgang til session store.
+// og socket initialization kræver adgang til session store.
+// I produktion, sørg for at MySQL session store er initialiseret før server start.
+
 global.io = io;
+global.sessionStore = sessionStore;
 
 initializeSocket(io, sessionStore, logger);
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 
 server.listen(PORT, () => {
-  logger.info({ port: PORT }, `Backend API + WebSocket server running on port ${PORT}`);
+  logger.info(
+    { port: PORT, environment: NODE_ENV, store: NODE_ENV === "production" ? "MySQL" : "Memory" },
+    "Backend API + WebSocket server started"
+  );
 });
 
-app.use((error, req, res, next) => {
-  if (error && error.code === "EBADCSRFTOKEN") {
-    logger.warn("Invalid CSRF token");
-    return res.status(403).json({ message: "Invalid CSRF token" });
-  }
-  next(error);
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM received, gracefully shutting down...");
+  server.close(() => {
+    logger.info("Server closed");
+    if (sessionStore && typeof sessionStore.close === "function") {
+      sessionStore.close();
+    }
+    process.exit(0);
+  });
 });

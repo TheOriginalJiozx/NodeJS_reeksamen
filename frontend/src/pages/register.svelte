@@ -3,14 +3,15 @@
   import { onMount } from "svelte";
   import user from "../store/usersStore.js";
   import { navigate, route } from "../lib/router.js";
+  import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../lib/responseUtils.js";
 
   let name = "";
   let fullName = "";
   let email = "";
   let password = "";
   let confirm = "";
-  let message = "";
 
   onMount(() => {
     if ($user) {
@@ -22,8 +23,6 @@
   async function submit(event) {
     event.preventDefault();
 
-    message = "Creating account...";
-
     try {
       const res = await apiFetch("/api/auth/register", {
         method: "POST",
@@ -31,31 +30,25 @@
         body: JSON.stringify({ username: name, fullname: fullName, email, password, confirmPassword: confirm }),
       });
 
-      let data = {};
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        data = { message: text };
-      }
+      const data = await parseResponse(res);
 
       if (!res.ok) {
-        message = data && data.message ? data.message : "Registration failed";
-        notifier.error(message);
+        const errMsg = getErrorMessage(data, "Registration failed");
+        notifier.error(errMsg);
         return;
       }
 
-      message = data.message || "Account created";
-      notifier.success(message);
+      const successMsg = getSuccessMessage(data, "Account created");
+      notifier.success(successMsg);
       name = "";
       fullName = "";
       email = "";
       password = "";
       confirm = "";
     } catch (error) {
-      message = "Network error. Please try again.";
-      notifier.error(message);
+      const errorMessage = error && error.message ? error.message : "Network error";
+      notifier.error(errorMessage);
+      logger.error("Registration error", errorMessage);
     }
   }
 </script>
@@ -65,9 +58,6 @@
     <div class="py-4 md:py-6 px-6">
       <section class="max-w-md mx-auto mt-3 bg-white rounded shadow p-6">
         <h2 class="text-2xl font-semibold mb-4">Create account</h2>
-        {#if message}
-          <div class="mb-4 text-sm text-blue-700">{message}</div>
-        {/if}
         <form on:submit={submit} class="space-y-4">
           <div>
             <label for="name" class="block text-sm mb-1">Username</label>

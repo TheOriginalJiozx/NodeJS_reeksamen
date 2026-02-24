@@ -76,6 +76,14 @@ async function query(sql, values = []) {
       lastError = error;
       retries--;
       if (retries > 0) {
+        logger.warn(`Database query error, retrying... (${3 - retries}/3)`, error.message);
+        // spørgsmål: hvorfor bruger vi en Promise her?
+        // en Promise er en måde at vente på noget asynkront på,
+        // i dette tilfælde en timeout, før den fortsætter med at prøve igen
+        // Her venter den i 100 millisekunder, før den prøver at køre forespørgslen igen
+        // Dette kan hjælpe med at håndtere midlertidige forbindelsesproblemer eller belastning på databasen
+        // En Promise lover at den vil blive opfyldt (resolve) eller afvist (reject) på et tidspunkt i fremtiden,
+        // og vi bruger setTimeout til at skabe en forsinkelse, før vi prøver igen
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }

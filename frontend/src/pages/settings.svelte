@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import apiFetch from "../lib/api.js";
   import notifier from "../lib/notifier.js";
+  import logger from "../lib/logger.js";
+  import { loadAuthenticatedUser } from "../lib/authUtils.js";
 
   let loading = true;
   let currentUser = null;
@@ -20,25 +22,20 @@
   onMount(async () => {
     loading = true;
     try {
-      const cached = localStorage.getItem("user");
-      let parsed = null;
-      try {
-        parsed = cached ? JSON.parse(cached) : null;
-      } catch (error) {
-        parsed = null;
-      }
+      const parsed = loadAuthenticatedUser();
       if (!parsed || !parsed.id) {
         currentUser = null;
         return;
       }
-      const me = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
-      if (!me.ok) {
+      const user = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
+      if (!user.ok) {
         currentUser = null;
         return;
       }
-      const data = await me.json();
+      const data = await user.json();
       currentUser = data.user || null;
     } catch (error) {
+      logger.error("Settings load error", error && error.message ? error.message : error);
       currentUser = null;
     } finally {
       loading = false;
@@ -60,6 +57,7 @@
       currentUser.username = newUsername;
       newUsername = "";
     } catch (error) {
+      logger.error("Change username error", error && error.message ? error.message : error);
       notifier.error("Network error");
     } finally {
       changingUsername = false;
@@ -81,6 +79,7 @@
       currentUser.fullName = newFullName;
       newFullName = "";
     } catch (error) {
+      logger.error("Change full name error", error && error.message ? error.message : error);
       notifier.error("Network error");
     } finally {
       changingFullName = false;
@@ -108,6 +107,7 @@
       newPassword = "";
       confirmNewPassword = "";
     } catch (error) {
+      logger.error("Change password error", error && error.message ? error.message : error);
       passwordMessage = "Network error";
     } finally {
       changingPassword = false;

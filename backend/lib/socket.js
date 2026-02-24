@@ -16,7 +16,17 @@ export async function getSessionByCookieHeader(cookieHeader, sessionStore, logge
     if (!sessionId) return null;
     const store = sessionStore;
     if (!store || typeof store.get !== "function") return null;
-    return await new Promise((resolve) => store.get(sessionId, (error, session) => resolve(session)));
+    return await new Promise((resolve) => {
+      store.get(sessionId, (error, session) => {
+        if (error) {
+          if (logger && typeof logger.debug === "function") {
+            logger.debug("Session store get error", error && error.message ? error.message : error);
+          }
+          return resolve(null);
+        }
+        resolve(session);
+      });
+    });
   } catch (error) {
     if (logger && typeof logger.debug === "function") logger.debug("getSessionByCookieHeader error", error && error.message ? error.message : error);
     return null;
