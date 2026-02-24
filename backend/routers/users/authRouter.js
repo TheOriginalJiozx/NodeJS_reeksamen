@@ -21,11 +21,19 @@ router.post(`${API}/auth/login`, authLimiter, async (req, res) => {
   const username = (req.body.username || "").trim();
   const password = req.body.password || "";
 
+  if (!username || !password) {
+    return res.status(400).json({ message: "Missing username or password" });
+  }
+
   const result = await db.query(userQueries.selectUserForLogin, [username]);
   const user = result.rows[0];
 
-  if (result.rowCount === 0 || !auth.validatePassword(password, user && user.passwordHash)) {
-    return res.status(401).json({ message: "Invalid username or password" });
+  if (result.rowCount === 0) {
+    return res.status(401).json({ message: "User does not exist" });
+  }
+
+  if (!auth.validatePassword(password, user && user.passwordHash)) {
+    return res.status(401).json({ message: "Invalid password" });
   }
 
   return new Promise((resolve) => {
@@ -63,20 +71,39 @@ router.post(`${API}/auth/logout`, isLoggedIn, (req, res) => {
 router.post(`${API}/auth/register`, authLimiter, async (req, res) => {
   try {
     const username = (req.body.username || "").trim();
+    const fullname = (req.body.fullname || "").trim();
     const email = (req.body.email || "").trim().toLowerCase();
     const password = req.body.password || "";
+    const confirmPassword = req.body.confirmPassword || "";
 
-    if (!username || !email || !password) {
+    if (!username || !fullname || !email || !password || !confirmPassword) {
       return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
     }
 
     if (!/^[A-Za-z0-9_]+$/.test(username)) {
       return res.status(400).json({ message: "Username may only contain letters, numbers and underscores" });
     }
 
+    if (!/^[A-Za-z0-9\s-]+$/.test(fullname)) {
+      return res.status(400).json({ message: "Fullname may only contain letters, numbers, spaces and hyphens" });
+    }
+
+    if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address" });
+    }
+
     const chosenUsername = await db.query(userQueries.findUserByUsername, [username]);
     if (chosenUsername.rowCount > 0) {
       return res.status(409).json({ message: "Username already in use" });
+    }
+
+    const reservedUsername = await db.query(userQueries.findReservedUsername, [username]);
+    if (reservedUsername.rowCount > 0) {
+      return res.status(409).json({ message: "You cannot create a user with this username" });
     }
 
     const chosenEmail = await db.query(userQueries.findUserByEmail, [email]);

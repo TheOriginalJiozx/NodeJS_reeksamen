@@ -53,4 +53,12 @@ CREATE TABLE IF NOT EXISTS bookings (
   KEY idx_bookings_resource (resource_id, end_date),
   CONSTRAINT fk_bookings_resource FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS reserved_usernames (
+  id INT NOT NULL AUTO_INCREMENT,
+  username VARCHAR(350) NOT NULL,
+  reserved_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY username_UNIQUE (username)
+);
 `;

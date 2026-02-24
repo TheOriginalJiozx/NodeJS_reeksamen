@@ -8,6 +8,8 @@
 
   let newUsername = "";
   let changingUsername = false;
+  let newFullName = "";
+  let changingFullName = false;
 
   let currentPassword = "";
   let newPassword = "";
@@ -45,13 +47,12 @@
 
   async function changeUsername() {
     if (!currentUser || !currentUser.id) return;
-    if (!newUsername) return notifier.error("Enter a username");
     changingUsername = true;
     try {
       const res = await apiFetch(`/api/users/${currentUser.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: newUsername }),
+        body: JSON.stringify({ newUsername }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return notifier.error(data.message || "Failed to change username");
@@ -65,20 +66,36 @@
     }
   }
 
+  async function changeFullName() {
+    if (!currentUser || !currentUser.id) return;
+    changingFullName = true;
+    try {
+      const res = await apiFetch(`/api/users/${currentUser.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newFullName: newFullName.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return notifier.error(data.message || "Failed to change full name");
+      notifier.success(data.message || "Full name updated");
+      currentUser.fullName = newFullName;
+      newFullName = "";
+    } catch (error) {
+      notifier.error("Network error");
+    } finally {
+      changingFullName = false;
+    }
+  }
+
   async function changePassword() {
     if (!currentUser || !currentUser.id) return;
-    if (!currentPassword || !newPassword || !confirmNewPassword) return (passwordMessage = "Fill all password fields");
-    if (newPassword !== confirmNewPassword) {
-      passwordMessage = "New passwords do not match";
-      return;
-    }
     changingPassword = true;
     passwordMessage = "";
     try {
       const res = await apiFetch(`/api/users/${currentUser.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword, confirmNewPassword }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -115,6 +132,14 @@
               <div class="mt-2 flex gap-2">
                 <input class="border px-2 py-1 flex-1" placeholder="New username" bind:value={newUsername} />
                 <button class="bg-blue-600 text-white px-3 py-1 rounded" on:click|preventDefault={changeUsername} disabled={changingUsername}>{changingUsername ? "Saving..." : "Change"}</button>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="font-semibold">Correct full name</h3>
+              <div class="mt-2 flex gap-2">
+                <input class="border px-2 py-1 flex-1" placeholder="Correct full name" bind:value={newFullName} />
+                <button class="bg-blue-600 text-white px-3 py-1 rounded" on:click|preventDefault={changeFullName} disabled={changingFullName}>{changingFullName ? "Saving..." : "Change"}</button>
               </div>
             </div>
 

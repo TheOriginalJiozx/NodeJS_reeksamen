@@ -2,12 +2,12 @@
   import { onMount, onDestroy } from "svelte";
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
-  import { fetchAvailability } from "../fetcher/bookingFetchers.js";
-  import apiFetch from "../lib/api.js";
-  import { handleAddAvailability } from "../handler/bookingHandlers.js";
-  import notifier from "../lib/notifier.js";
-  import { today, contiguousEndDates } from "../util/bookingUtils.js";
-  import logger from "../lib/logger.js";
+  import { fetchAvailability } from "../../fetcher/bookingFetchers.js";
+  import apiFetch from "../../lib/api.js";
+  import { handleAddAvailability } from "../../handler/bookingHandlers.js";
+  import notifier from "../../lib/notifier.js";
+  import { today, contiguousEndDates } from "../../util/bookingUtils.js";
+  import logger from "../../lib/logger.js";
 
   let resourcesOwned = [];
   let available = { resourceId: "", startDate: "", endDate: "" };

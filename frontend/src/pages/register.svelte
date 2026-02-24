@@ -6,6 +6,7 @@
   import apiFetch from "../lib/api.js";
 
   let name = "";
+  let fullName = "";
   let email = "";
   let password = "";
   let confirm = "";
@@ -20,21 +21,6 @@
 
   async function submit(event) {
     event.preventDefault();
-    if (!name || !email || !password) {
-      message = "Please fill in all fields.";
-      return;
-    }
-
-    const usernameValid = /^[A-Za-z0-9_]+$/.test(name);
-    if (!usernameValid) {
-      message = "Username may only contain letters, numbers and underscores (no spaces or special characters).";
-      return;
-    }
-
-    if (password !== confirm) {
-      message = "Passwords do not match.";
-      return;
-    }
 
     message = "Creating account...";
 
@@ -42,7 +28,7 @@
       const res = await apiFetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: name, email, password }),
+        body: JSON.stringify({ username: name, fullname: fullName, email, password, confirmPassword: confirm }),
       });
 
       let data = {};
@@ -63,6 +49,7 @@
       message = data.message || "Account created";
       notifier.success(message);
       name = "";
+      fullName = "";
       email = "";
       password = "";
       confirm = "";
@@ -83,20 +70,24 @@
         {/if}
         <form on:submit={submit} class="space-y-4">
           <div>
-            <label for="name" class="block text-sm mb-1">Name</label>
-            <input id="name" class="w-full border rounded px-3 py-2" bind:value={name} />
+            <label for="name" class="block text-sm mb-1">Username</label>
+            <input id="name" autocomplete="username" class="w-full border rounded px-3 py-2" bind:value={name} />
+          </div>
+          <div>
+            <label for="fullname" class="block text-sm mb-1">Full name</label>
+            <input id="fullname" autocomplete="fullName" class="w-full border rounded px-3 py-2" bind:value={fullName} />
           </div>
           <div>
             <label for="email" class="block text-sm mb-1">Email</label>
-            <input id="email" type="email" class="w-full border rounded px-3 py-2" bind:value={email} />
+            <input id="email" autocomplete="email" class="w-full border rounded px-3 py-2" bind:value={email} />
           </div>
           <div>
             <label for="password" class="block text-sm mb-1">Password</label>
-            <input id="password" type="password" class="w-full border rounded px-3 py-2" bind:value={password} />
+            <input id="password" type="password" autocomplete="new-password" class="w-full border rounded px-3 py-2" bind:value={password} />
           </div>
           <div>
             <label for="confirm" class="block text-sm mb-1">Confirm password</label>
-            <input id="confirm" type="password" class="w-full border rounded px-3 py-2" bind:value={confirm} />
+            <input id="confirm" type="password" autocomplete="new-password" class="w-full border rounded px-3 py-2" bind:value={confirm} />
           </div>
           <div>
             <button class="bg-blue-600 text-white px-4 py-2 rounded">Create account</button>

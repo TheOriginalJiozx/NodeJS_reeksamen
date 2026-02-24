@@ -43,15 +43,22 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
     const conflict = await db.query(bookingQueries.checkActiveBookingsForOwner, [username]);
     if (conflict?.rowCount > 0) return res.status(409).json({ message: "Cannot delete account while active bookings exist for your resources" });
 
+    const userHasBookings = await db.query(userQueries.checkUserHasBookings, [username]);
+
     const images = await db.query(userQueries.selectImagesByOwner, [username]);
     const resourceImages = (images.rows || []).map((resource) => resource.image).filter(Boolean);
 
     try {
-      await db.query("BEGIN TRANSACTION");
+      await db.query("START TRANSACTION");
       await db.query(userQueries.deleteBookingsByOwnerResources, [username]);
       await db.query(userQueries.deleteAvailabilitiesByOwnerResources, [username]);
       await db.query(userQueries.deleteResourcesByOwner, [username]);
       await db.query(userQueries.deleteUserById, [idParameter]);
+      
+      if (userHasBookings?.rowCount > 0) {
+        await db.query(userQueries.reserveUsername, [username]);
+      }
+      
       await db.query("COMMIT");
     } catch (transactionError) {
       try {
@@ -94,8 +101,9 @@ router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res
   if (!isValidId(idParameter)) return res.status(400).json({ message: "Invalid user id" });
 
   try {
-    const { username: newUsername, currentPassword, newPassword } = req.body || {};
-    if (!newUsername && !newPassword) return res.status(400).json({ message: "No changes provided" });
+    let { newUsername, newFullName, currentPassword, newPassword, confirmNewPassword } = req.body || {};
+    newFullName = newFullName ? String(newFullName).trim() : null;
+    if (!newUsername && !newFullName && !newPassword) return res.status(400).json({ message: "No changes provided" });
 
     const userRow = await db.query(userQueries.selectUserById, [idParameter]);
     const existing = userRow.rows?.[0];
@@ -109,7 +117,7 @@ router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res
       const oldUsername = existing.username;
       
       try {
-        await db.query("BEGIN");
+        await db.query("START TRANSACTION");
         await db.query(userQueries.updateUsername, [newUsername, idParameter]);
         await db.query(userQueries.updateBookingsBooker, [newUsername, oldUsername]);
         await db.query(userQueries.updateResourcesOwner, [newUsername, oldUsername]);
@@ -137,8 +145,20 @@ router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res
       }
     }
 
+    if (newFullName && newFullName !== existing.fullname) {
+      if (!/^[A-Za-z0-9\s-]+$/.test(newFullName)) return res.status(400).json({ message: "Fullname may only contain letters, numbers, spaces and hyphens" });
+      await db.query(userQueries.updateFullName, [newFullName, idParameter]);
+      try {
+        if (req.session?.user?.id && String(req.session.user.id) === String(idParameter)) req.session.user.fullname = newFullName;
+      } catch (error) {
+        logger.debug("Could not update session fullname after change", error);
+      }
+    }
+
     if (newPassword) {
       if (!currentPassword) return res.status(400).json({ message: "Current password required" });
+      if (!confirmNewPassword) return res.status(400).json({ message: "Please confirm new password" });
+      if (newPassword !== confirmNewPassword) return res.status(400).json({ message: "Passwords do not match" });
       const loginRow = await db.query(userQueries.selectUserForLogin, [existing.username]);
       const stored = loginRow.rows?.[0]?.passwordHash || null;
       if (!auth.validatePassword(currentPassword, stored)) return res.status(403).json({ message: "Current password incorrect" });

@@ -4,8 +4,8 @@
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
   import notifier from "../lib/notifier.js";
-  import ImagePreview from "../components/imagePreview.svelte";
-  import BookingRow from "../components/bookingRow.svelte";
+  import ImagePreview from "../components/resources/imagePreview.svelte";
+  import BookingRow from "../components/bookings/bookingRow.svelte";
 
   let loading = true;
   let user = null;

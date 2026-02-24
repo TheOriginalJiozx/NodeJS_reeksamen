@@ -1,7 +1,7 @@
 <script>
-  import BookingList from "./bookingList.svelte";
+  import BookingList from "../bookings/bookingList.svelte";
   import ResourceImages from "./resourceImages.svelte";
-  import AvailabilitiesList from "./availabilitiesList.svelte";
+  import AvailabilitiesList from "../availability/availabilitiesList.svelte";
 
   export let resources = [];
   export let resourceBookings = {};

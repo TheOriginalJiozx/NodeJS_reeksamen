@@ -28,6 +28,8 @@ try {
     port: DB_PORT,
     waitForConnections: true,
     connectionLimit: 10,
+    enableKeepAlive: true,
+    keepAliveInitialDelayMs: 0,
   });
 
   pool
@@ -62,8 +64,24 @@ async function query(sql, values = []) {
   if (!pool) {
     throw new Error("Database connection not available");
   }
-  const [rows] = await pool.query(sql, values);
-  return { rows, rowCount: rows.length };
+  
+  let retries = 3;
+  let lastError;
+  
+  while (retries > 0) {
+    try {
+      const [rows] = await pool.query(sql, values);
+      return { rows, rowCount: rows.length };
+    } catch (error) {
+      lastError = error;
+      retries--;
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+  }
+  
+  throw lastError;
 }
 
 const db = { query };

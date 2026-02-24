@@ -1,5 +1,5 @@
 <script>
-  import { toasts, remove } from "../store/toastStore.js";
+  import { toasts, remove } from "../../store/toastStore.js";
 </script>
 
 <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 space-y-2 p-2">

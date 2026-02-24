@@ -1,13 +1,13 @@
 <script>
   import { onMount, onDestroy } from "svelte";
-  import { navigate } from "../lib/router.js";
-  import user, { bootstrap } from "../store/usersStore.js";
-  import notifications, { notificationCount } from "../store/notificationsStore.js";
-  import notifier from "../lib/notifier.js";
-  import { pushNotification } from "../store/notificationsStore.js";
-  import apiFetch, { clearCsrfCache } from "../lib/api.js";
-  import { clearAuth } from "../lib/authentication.js";
-  import logger from "../lib/logger.js";
+  import { navigate } from "../../lib/router.js";
+  import user, { bootstrap } from "../../store/usersStore.js";
+  import notifications, { notificationCount } from "../../store/notificationsStore.js";
+  import notifier from "../../lib/notifier.js";
+  import { pushNotification } from "../../store/notificationsStore.js";
+  import apiFetch, { clearCsrfCache } from "../../lib/api.js";
+  import { clearAuth } from "../../lib/authentication.js";
+  import logger from "../../lib/logger.js";
 
   let navSocket = null;
   let unsubscribeUser = null;
@@ -100,6 +100,14 @@
       clearCsrfCache();
     } catch (error) {
       logger.error("Error clearing CSRF cache on logout", error && error.message ? error.message : error);
+    }
+    if (navSocket && typeof navSocket.disconnect === "function") {
+      try {
+        navSocket.disconnect();
+      } catch (error) {
+        logger.warn("Failed to disconnect nav socket on logout", error && error.message ? error.message : error);
+      }
+      navSocket = null;
     }
     navigate("/login");
   }

@@ -1,11 +1,11 @@
 <script>
   import { onMount } from "svelte";
-  import { fetchTypes, fetchAllResources } from "../fetcher/bookingFetchers.js";
-  import apiFetch from "../lib/api.js";
-  import CarFields from "./CarFields.svelte";
+  import { fetchTypes, fetchAllResources } from "../../fetcher/bookingFetchers.js";
+  import apiFetch from "../../lib/api.js";
+  import CarFields from "./carFields.svelte";
   import ImageUploader from "./imageUploader.svelte";
-  import { handleCreate } from "../handler/bookingHandlers.js";
-  import logger from "../lib/logger.js";
+  import { handleCreate } from "../../handler/bookingHandlers.js";
+  import logger from "../../lib/logger.js";
 
   let types = [];
   let create = { name: "", type: "" };

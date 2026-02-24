@@ -1,12 +1,12 @@
 <script>
   import { route } from "./lib/router.js";
   import { onMount } from "svelte";
-  import Toast from "./components/toast.svelte";
-  import Navbar from "./components/navbar.svelte";
+  import Toast from "./components/layout/toast.svelte";
+  import Navbar from "./components/layout/navbar.svelte";
   import Create from "./pages/create.svelte";
   import Book from "./pages/book.svelte";
   import Home from "./pages/home.svelte";
-  import Footer from "./components/footer.svelte";
+  import Footer from "./components/layout/footer.svelte";
   import Login from "./pages/login.svelte";
   import Register from "./pages/register.svelte";
   import Profile from "./pages/profile.svelte";

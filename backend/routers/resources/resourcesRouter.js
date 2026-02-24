@@ -49,7 +49,7 @@ router.post("/api/resources", isLoggedIn, async (req, res) => {
     }
 
     const result = await db.query(queries.insertResource, [name, typeName, owner]);
-    const insertId = result.rows?.[0]?.insertId ?? null;
+    const insertId = result.rows?.insertId ?? null;
     const imageUrl = req.body?.imageUrl ?? null;
     if (insertId && imageUrl) {
       try {

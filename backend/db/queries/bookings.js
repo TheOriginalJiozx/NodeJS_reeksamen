@@ -1,5 +1,5 @@
-export const getBookingsForResource = `SELECT id, booker, resource_id, DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date, DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date, comment, image, confirmed FROM bookings WHERE resource_id = ? ORDER BY start_date`;
-export const getAllBookings = `SELECT id, booker, resource_id, DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date, DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date, comment, image, confirmed FROM bookings ORDER BY start_date`;
+export const getBookingsForResource = `SELECT id, booker, resource_id, DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate, DATE_FORMAT(end_date, '%Y-%m-%d') AS endDate, comment, image, confirmed FROM bookings WHERE resource_id = ? ORDER BY start_date`;
+export const getAllBookings = `SELECT id, booker, resource_id, DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate, DATE_FORMAT(end_date, '%Y-%m-%d') AS endDate, comment, image, confirmed FROM bookings ORDER BY start_date`;
 
 export const checkAvailabilityExists = `SELECT 1 FROM availabilities WHERE resource_id = ? AND start_date <= ? AND end_date >= ?`;
 export const checkBookingConflict = `SELECT 1 FROM bookings WHERE resource_id = ? AND NOT (end_date < ? OR start_date > ?)`;

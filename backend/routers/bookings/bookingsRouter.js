@@ -79,7 +79,7 @@ router.post("/api/bookings", authLimiter, isLoggedIn, async (req, res) => {
 
     const insert = await db.query(queries.insertBooking, [booker, resourceId, startDate, endDate, comment]);
 
-    const insertId = insert.rows[0] && insert.rows[0].insertId ? insert.rows[0].insertId : null;
+    const insertId = insert.rows && insert.rows.insertId ? insert.rows.insertId : null;
 
     let resourceImage = null;
     try {
@@ -93,7 +93,7 @@ router.post("/api/bookings", authLimiter, isLoggedIn, async (req, res) => {
       );
     }
 
-    if (insertId && resourceImage) {
+    if (insertId) {
       try {
         await db.query(queries.updateBookingImage, [resourceImage, insertId]);
       } catch (error) {

@@ -3,7 +3,7 @@
   import { navigate } from "../lib/router.js";
   import apiFetch from "../lib/api.js";
   import logger from "../lib/logger.js";
-  import ResourceTable from "../components/resourceTable.svelte";
+  import ResourceTable from "../components/resources/resourceTable.svelte";
   import { initializeResourceSocket, disconnectSocket } from "../lib/socketUtils.js";
   import { confirmBooking, declineBooking, deleteResource, deleteAvailability, loadResourcesWithBookingsAndAvailability } from "../handler/resourceHandlers.js";
 

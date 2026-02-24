@@ -5,9 +5,9 @@ import { fetchAvailability } from "../fetcher/bookingFetchers.js";
 import logger from "../lib/logger.js";
 import { toast } from "../store/toastStore.js";
 
-export async function fetchBookingsFor(resourceID) {
+export async function fetchBookingsFor(resourceId) {
   try {
-    const res = await apiFetch(`/api/bookings?resourceID=${resourceID}`, { credentials: "include" });
+    const res = await apiFetch(`/api/bookings?resourceId=${resourceId}`, { credentials: "include" });
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.bookings) ? data.bookings : data.bookings || [];

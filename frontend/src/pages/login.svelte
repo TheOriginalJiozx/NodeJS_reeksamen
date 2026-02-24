@@ -19,11 +19,7 @@
 
   async function submit(event) {
     event.preventDefault();
-    if (!username || !password) {
-      message = "Please enter username and password.";
-      return;
-    }
-
+    
     message = "Logging in...";
 
     try {

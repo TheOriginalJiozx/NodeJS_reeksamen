@@ -1,5 +1,5 @@
 <script>
-  import MakeBooking from "../components/makeBooking.svelte";
+  import MakeBooking from "../components/bookings/makeBooking.svelte";
 </script>
 
 <div>

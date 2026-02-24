@@ -4,7 +4,7 @@
   import notifier from "../lib/notifier.js";
   import { clearAuth } from "../lib/authentication.js";
   import authUser from "../store/usersStore.js";
-  import { allowSelfOrAdmin, isAdmin } from "../lib/authorization.js";
+  import { isAdmin } from "../lib/authorization.js";
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
 
@@ -16,10 +16,6 @@
 
   async function deleteAccount() {
     if (!confirm("Are you sure you want to delete your account? This will remove your resources and related data.")) return;
-    if (!allowSelfOrAdmin($authUser, user?.id)) {
-      notifier.error("Forbidden: you are not allowed to delete this account");
-      return;
-    }
     deleting = true;
     try {
       const targetId = user && user.id ? user.id : null;
@@ -51,6 +47,8 @@
 
       if (res.status === 409) {
         notifier.error(data.message || "Cannot delete account while active bookings exist");
+      } else if (res.status === 403) {
+        notifier.error(data.message || "You are not allowed to delete this account");
       } else {
         notifier.error(data.message || "Failed to delete account");
       }
@@ -64,11 +62,6 @@
   async function exportData() {
     if (!confirm("Export your data to a JSON file?")) return;
     exporting = true;
-    if (!allowSelfOrAdmin($authUser, user?.id)) {
-      notifier.error("Forbidden: you are not allowed to export this account's data");
-      exporting = false;
-      return;
-    }
     try {
       const apiFetch = (await import("../lib/api.js")).default;
       const res = await apiFetch("/api/users/export", { method: "POST" });
