@@ -36,6 +36,11 @@ router.post(`${API}/auth/login`, authLimiter, async (req, res) => {
     return res.status(401).json({ message: "Invalid password" });
   }
 
+  // spørgsmål: hvorfor buger vi Promise her?
+  // Vi bruger en Promise her for at håndtere den asynkrone natur af session.regenerate,
+  // som ikke returnerer en Promise i sig selv.
+  // Ved at indpakke det i en Promise kan vi bruge async/await-syntaksen,
+  // hvilket gør koden mere læsbar og lettere at håndtere i tilfælde af fejl.
   return new Promise((resolve) => {
     req.session.regenerate((error) => {
       if (error) {

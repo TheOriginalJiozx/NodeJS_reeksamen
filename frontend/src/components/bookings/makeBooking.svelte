@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import { fetchAllResources, fetchAvailability } from "../../fetcher/bookingFetchers.js";
-  import { handleBooking } from "../../handler/bookingHandlers.js";
+  import { fetchAllResources, fetchAvailability } from "../../fetchers/bookingFetchers.js";
+  import { handleBooking } from "../../handlers/bookingHandlers.js";
   import notifier from "../../lib/notifier.js";
   import BookingDatePicker from "./bookingDatePicker.svelte";
   import BookingImagePreview from "./bookingImagePreview.svelte";

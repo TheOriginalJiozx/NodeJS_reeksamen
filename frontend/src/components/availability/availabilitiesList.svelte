@@ -1,5 +1,5 @@
 <script>
-  import { fetchAvailability } from "../../fetcher/bookingFetchers.js";
+  import { fetchAvailability } from "../../fetchers/bookingFetchers.js";
 
   export let resourceId = null;
   export let availabilities = [];

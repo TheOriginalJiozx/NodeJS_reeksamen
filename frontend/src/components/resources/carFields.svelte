@@ -19,9 +19,8 @@
   $: modelsForBrand = createBrand && brandModels[createBrand] ? brandModels[createBrand] : [];
 </script>
 
-{#if true}
-  <div class="grid grid-cols-3 gap-2">
-    <select class="border rounded p-2" bind:value={createBrand}>
+<div class="grid grid-cols-3 gap-2">
+  <select class="border rounded p-2" bind:value={createBrand}>
       <option value="">Brand</option>
       {#each Object.keys(brandModels) as brand}
         <option value={brand}>{brand}</option>
@@ -54,4 +53,3 @@
       {/each}
     </select>
   </div>
-{/if}

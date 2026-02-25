@@ -16,7 +16,7 @@ import bookingsActionsRouter from "./routers/bookings/bookingsActionsRouter.js";
 import resourcesRouter from "./routers/resources/resourcesRouter.js";
 import typesRouter from "./routers/types/typesRouter.js";
 import uploadsRouter from "./routers/uploads/uploadsRouter.js";
-import initializeSocket from "./lib/socket.js";
+import initializeSocket from "./utils/socketUtils.js";
 import csrfMiddleware from "./middleware/csrfMiddleware.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
@@ -42,13 +42,13 @@ try {
   sessionStore = new MySQLStore(sessionOptions);
   logger.info("MySQL session store initialized successfully");
 } catch (error) {
+  logger.error(error, "Failed to initialize MySQL session store");
   if (NODE_ENV === "production") {
-    logger.error(error, "CRITICAL: Could not initialize MySQL session store in production. Server cannot start.");
+    logger.error("CRITICAL: Cannot start server in production without MySQL session store. Exiting.");
     process.exit(1);
-  } else {
-    logger.warn("Could not initialize MySQL session store, falling back to MemoryStore for development:", error.message);
-    sessionStore = new session.MemoryStore();
   }
+  logger.warn("Falling back to MemoryStore for development only. Sessions will NOT persist between restarts.");
+  sessionStore = new session.MemoryStore();
 }
 
 app.use(express.json());

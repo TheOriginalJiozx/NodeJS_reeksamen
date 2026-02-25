@@ -6,7 +6,7 @@
   import ImageUploader from "./imageUploader.svelte";
   import { handleCreate } from "../../handler/bookingHandlers.js";
   import logger from "../../lib/logger.js";
-  import { getCachedUser } from "../../lib/authUtils.js";
+  import { getCachedUser } from "../../utils/authUtils.js";
 
   let types = [];
   let create = { name: "", type: "" };

@@ -5,9 +5,11 @@
   import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
   import ResourceTable from "../components/resources/resourceTable.svelte";
-  import { initializeSocket, disconnectSocket } from "../lib/socketManager.js";
-  import { loadAuthenticatedUser } from "../lib/authUtils.js";
+  import { initializeSocket, disconnectSocket } from "../utils/socketUtils.js";
+  import { loadAuthenticatedUser } from "../utils/authUtils.js";
   import { confirmBooking, declineBooking, deleteResource, deleteAvailability, loadResourcesWithBookingsAndAvailability } from "../handler/resourceHandlers.js";
+
+  const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
   let loading = true;
   let user = null;
@@ -80,8 +82,7 @@
       user = (await me.json()).user || null;
       await fetchResources();
 
-      const socketUrl = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
-      socket = initializeSocket(socketUrl, user?.username, fetchResources);
+      socket = initializeSocket(BACKEND_ORIGIN, user?.username, fetchResources);
     } catch (error) {
       notifier.error("Failed to load resources");
       logger.error("Failed to fetch user or resources", error && error.message ? error.message : error);

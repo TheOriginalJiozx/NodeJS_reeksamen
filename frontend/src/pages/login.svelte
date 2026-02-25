@@ -6,7 +6,7 @@
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
   import { setAuth } from "../lib/authentication.js";
-  import { parseResponse, getErrorMessage, getSuccessMessage } from "../lib/responseUtils.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../utils/responseUtils.js";
 
   let username = "";
   let password = "";

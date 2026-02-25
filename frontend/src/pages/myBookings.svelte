@@ -4,9 +4,11 @@
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
   import notifier from "../lib/notifier.js";
-  import { loadAuthenticatedUser } from "../lib/authUtils.js";
+  import { loadAuthenticatedUser } from "../utils/authUtils.js";
   import ImagePreview from "../components/resources/imagePreview.svelte";
   import BookingRow from "../components/bookings/bookingRow.svelte";
+
+  const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
   let loading = true;
   let user = null;
@@ -81,9 +83,8 @@
       ]);
 
       try {
-        const socketUrl = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
         if (typeof globalThis.io === "function") {
-          socket = globalThis.io(socketUrl, { withCredentials: true });
+          socket = globalThis.io(BACKEND_ORIGIN, { withCredentials: true });
           socket.on("booking:created", () => fetchBookings());
           socket.on("booking:deleted", () => {
             notifier.info("A booking was removed");

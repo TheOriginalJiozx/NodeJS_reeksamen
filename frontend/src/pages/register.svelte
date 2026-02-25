@@ -5,7 +5,7 @@
   import { navigate, route } from "../lib/router.js";
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
-  import { parseResponse, getErrorMessage, getSuccessMessage } from "../lib/responseUtils.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../utils/responseUtils.js";
 
   let name = "";
   let fullName = "";

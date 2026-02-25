@@ -7,8 +7,9 @@ import { isLoggedIn } from "../../middleware/authMiddleware.js";
 import { spawn } from "child_process";
 
 const router = Router();
+const API = "/api";
 
-const uploadDirectory = path.resolve("./../Frontend/public/uploads");
+const uploadDirectory = path.resolve("./../frontend/public/uploads");
 try {
   fs.mkdirSync(uploadDirectory, {
     recursive: true,
@@ -86,7 +87,7 @@ async function scanFileForViruses(filePath) {
   });
 }
 
-router.post("/api/uploads", isLoggedIn, (req, res) => {
+router.post(`${API}/uploads`, isLoggedIn, (req, res) => {
   upload.single("file")(req, res, async (error) => {
     if (error) {
       if (error.code === "LIMIT_FILE_SIZE")
@@ -113,7 +114,7 @@ router.post("/api/uploads", isLoggedIn, (req, res) => {
 
       const filename = req.file.filename;
       const frontendOrigin = process.env.FRONTEND_ORIGIN || "";
-      const url = `${frontendOrigin.replace(/\/$/, "")}/api/uploads/${filename}`;
+      const url = `${frontendOrigin.replace(/\/$/, "")}${API}/uploads/${filename}`;
       return res.status(201).json({ url, filename });
     } catch (error) {
       logger.error(error, "POST /api/uploads error");
@@ -122,7 +123,7 @@ router.post("/api/uploads", isLoggedIn, (req, res) => {
   });
 });
 
-router.get("/api/uploads/:filename", (req, res) => {
+router.get(`${API}/uploads/:filename`, (req, res) => {
   try {
     const filename = path.basename(req.params.filename);
     const filePath = path.join(uploadDirectory, filename);

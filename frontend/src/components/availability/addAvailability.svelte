@@ -6,10 +6,10 @@
   import apiFetch from "../../lib/api.js";
   import { handleAddAvailability } from "../../handler/bookingHandlers.js";
   import notifier from "../../lib/notifier.js";
-  import { today, contiguousEndDates } from "../../util/bookingUtils.js";
+  import { today, contiguousEndDates } from "../../utils/bookingUtils.js";
   import logger from "../../lib/logger.js";
-  import { getCachedUser } from "../../lib/authUtils.js";
-
+  import { getCachedUser } from "../../utils/authUtils.js";
+  const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
   let resourcesOwned = [];
   let available = { resourceId: "", startDate: "", endDate: "" };
   let availability = [];
@@ -101,9 +101,8 @@
     });
 
     try {
-      const socketUrl = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
       if (typeof globalThis.io === "function") {
-        socket = globalThis.io(socketUrl, { withCredentials: true });
+        socket = globalThis.io(BACKEND_ORIGIN, { withCredentials: true });
         socket.on("resource:created", async () => {
           try {
             const cached = getCachedUser();

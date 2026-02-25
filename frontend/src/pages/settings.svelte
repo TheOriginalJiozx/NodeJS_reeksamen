@@ -3,7 +3,7 @@
   import apiFetch from "../lib/api.js";
   import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
-  import { loadAuthenticatedUser } from "../lib/authUtils.js";
+  import { loadAuthenticatedUser } from "../utils/authUtils.js";
 
   let loading = true;
   let currentUser = null;

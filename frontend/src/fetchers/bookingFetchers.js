@@ -1,5 +1,5 @@
 import logger from "../lib/logger.js";
-import { groupContinuousDates } from "../util/bookingUtils.js";
+import { groupContinuousDates } from "../utils/bookingUtils.js";
 export let baseURL = "/api";
 
 function computeDatesFromAvailabilities(availableDates) {
@@ -105,4 +105,19 @@ export async function fetchAvailability(id) {
 
   const availableRanges = groupContinuousDates(availableDates);
   return { availability, availableDates, availableRanges };
+}
+
+export async function fetchUserBookings() {
+  try {
+    const response = await apiFetch(`${baseURL}/bookings`, { credentials: "include" });
+    if (!response.ok) {
+      logger.warn("Failed to fetch user bookings", { status: response.status });
+      return [];
+    }
+    const data = await response.json();
+    return Array.isArray(data.bookings) ? data.bookings : [];
+  } catch (error) {
+    logger.error("Failed to fetch user bookings", error && error.message ? error.message : error);
+    return [];
+  }
 }

@@ -11,8 +11,9 @@ import logger from "../../lib/logger.js";
 import { sendServerError, deleteUploadFile, datesBetween } from "../../utils/resourceUtils.js";
 
 const router = Router();
+const API = "/api";
 
-router.get("/api/resources", isLoggedIn, async (req, res) => {
+router.get(`${API}/resources`, isLoggedIn, async (req, res) => {
   try {
     const result = await db.query(queries.getAllResources, [req.user.username]);
     return res.status(200).json(result.rows);
@@ -21,7 +22,7 @@ router.get("/api/resources", isLoggedIn, async (req, res) => {
   }
 });
 
-router.get("/api/users/:id/resources", isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
+router.get(`${API}/users/:id/resources`, isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
   try {
     const id = req.params.id;
     const userRow = await db.query(userQueries.selectUserById, [id]);
@@ -34,7 +35,7 @@ router.get("/api/users/:id/resources", isLoggedIn, allowSelfOrAdmin(), async (re
   }
 });
 
-router.post("/api/resources", isLoggedIn, async (req, res) => {
+router.post(`${API}/resources`, isLoggedIn, async (req, res) => {
   try {
     const { name, type } = req.body;
     const owner = req.user?.username ?? null;
@@ -80,9 +81,13 @@ router.post("/api/resources", isLoggedIn, async (req, res) => {
   }
 });
 
-router.get("/api/resources/:id/availabilities", isLoggedIn, async (req, res) => {
+router.get(`${API}/resources/:id/availabilities`, isLoggedIn, async (req, res) => {
   try {
     const id = req.params.id;
+    // spørgsmål: hvorfor bruger vi Promise.all her?
+    // Promise.all bruges til at køre flere asynkrone operationer parallelt og vente på, at de alle er færdige
+    // I dette tilfælde vil vi gerne hente både tilgængeligheder og bookinger for ressourcen samtidig
+    // Ved at bruge Promise.all kan vi starte begge forespørgsler på samme tid, hvilket kan være hurtigere end at vente på den første, før vi starter den anden
     const [availableResult, bookingsResult] = await Promise.all([db.query(queries.availabilitiesForResource, [id]), db.query(queries.bookingsForResource, [id])]);
     const availableSet = new Set();
     for (const available of availableResult.rows) if (available.startDate && available.endDate) datesBetween(available.startDate, available.endDate).forEach((date) => availableSet.add(date));
@@ -93,7 +98,7 @@ router.get("/api/resources/:id/availabilities", isLoggedIn, async (req, res) => 
   }
 });
 
-router.post("/api/resources/:id/availabilities", isLoggedIn, async (req, res) => {
+router.post(`${API}/resources/:id/availabilities`, isLoggedIn, async (req, res) => {
   try {
     const id = req.params.id;
     const { startDate, endDate } = req.body;
@@ -128,7 +133,7 @@ router.post("/api/resources/:id/availabilities", isLoggedIn, async (req, res) =>
   }
 });
 
-router.delete("/api/resources/:id/availabilities/:availabilityId", isLoggedIn, async (req, res) => {
+router.delete(`${API}/resources/:id/availabilities/:availabilityId`, isLoggedIn, async (req, res) => {
   try {
     const resourceId = req.params.id;
     const availabilityId = req.params.availabilityId;
@@ -172,7 +177,7 @@ router.delete("/api/resources/:id/availabilities/:availabilityId", isLoggedIn, a
   }
 });
 
-router.delete("/api/resources/:id", isLoggedIn, async (req, res) => {
+router.delete(`${API}/resources/:id`, isLoggedIn, async (req, res) => {
   try {
     const id = req.params.id;
     const ownerCheck = await db.query(queries.selectResourceOwner, [id]);

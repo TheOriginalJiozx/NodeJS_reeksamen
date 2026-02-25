@@ -7,8 +7,8 @@
   import { isAdmin } from "../lib/authorization.js";
   import logger from "../lib/logger.js";
   import apiFetch from "../lib/api.js";
-  import { loadAuthenticatedUser, clearUserCache } from "../lib/authUtils.js";
-  import { parseResponse, getErrorMessage, getSuccessMessage } from "../lib/responseUtils.js";
+  import { loadAuthenticatedUser, clearUserCache } from "../utils/authUtils.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../utils/responseUtils.js";
 
   let user = null;
   let loading = true;

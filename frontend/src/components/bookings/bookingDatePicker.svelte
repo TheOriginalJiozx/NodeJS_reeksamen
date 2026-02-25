@@ -2,7 +2,7 @@
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
   import logger from "../../lib/logger.js";
-  import { today, contiguousEndDates } from "../../util/bookingUtils.js";
+  import { today, contiguousEndDates } from "../../utils/bookingUtils.js";
 
   export let booking = { startDate: "", endDate: "" };
   export let availableDates = [];

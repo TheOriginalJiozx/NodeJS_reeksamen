@@ -5,8 +5,9 @@ import { isLoggedIn } from "../../middleware/authMiddleware.js";
 import logger from "../../lib/logger.js";
 
 const router = Router();
+const API = "/api";
 
-router.get("/api/types", isLoggedIn, async (req, res) => {
+router.get(`${API}/types`, isLoggedIn, async (req, res) => {
   try {
     const result = await db.query(queries.getTypes);
     return res.status(200).json(result.rows);

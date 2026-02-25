@@ -2,23 +2,81 @@
   import { onMount, onDestroy } from "svelte";
   import { navigate } from "../../lib/router.js";
   import user, { bootstrap } from "../../store/usersStore.js";
-  import notifications, { notificationCount } from "../../store/notificationsStore.js";
+  import notifications, { resourceBookingCount, myBookingCount, pushNotification, clearNotifications } from "../../store/notificationsStore.js";
   import notifier from "../../lib/notifier.js";
-  import { pushNotification } from "../../store/notificationsStore.js";
   import apiFetch, { clearCsrfCache } from "../../lib/api.js";
   import { clearAuth } from "../../lib/authentication.js";
   import logger from "../../lib/logger.js";
+  import { loadResourcesWithBookingsAndAvailability } from "../../handlers/resourceHandlers.js";
+  import { fetchUserBookings } from "../../fetchers/bookingHandlers.js";
+
+  const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
   let navSocket = null;
   let unsubscribeUser = null;
 
+  async function loadExistingNotifications(userId) {
+    try {
+      const { resources, resourceBookings } = await loadResourcesWithBookingsAndAvailability(userId);
+      const allNotifications = [];
+      
+      resources.forEach((resource) => {
+        const bookings = resourceBookings[String(resource.id)] || [];
+        bookings.forEach((booking) => {
+          if (!booking.confirmed) {
+            allNotifications.push({
+              type: "booking",
+              navTo: "/myresources",
+              bookingId: booking.id,
+              resourceId: resource.id,
+              resourceName: resource.name,
+              bookingDate: booking.bookingDate,
+              bookingEndDate: booking.bookingEndDate,
+            });
+          }
+        });
+      });
+      
+      const userBookings = await fetchUserBookings();
+      userBookings.forEach((booking) => {
+        if (booking.confirmed === true) {
+          allNotifications.push({
+            type: "booking:confirmed",
+            navTo: "/mybookings",
+            bookingId: booking.id,
+            resourceId: booking.resourceId,
+            resourceName: booking.resourceName,
+            bookingDate: booking.bookingDate,
+            bookingEndDate: booking.bookingEndDate,
+          });
+        } else if (booking.confirmed === false && booking.confirmedAt) {
+          allNotifications.push({
+            type: "booking:declined",
+            navTo: "/mybookings",
+            bookingId: booking.id,
+            resourceId: booking.resourceId,
+            resourceName: booking.resourceName,
+            bookingDate: booking.bookingDate,
+            bookingEndDate: booking.bookingEndDate,
+          });
+        }
+      });
+      
+      allNotifications.forEach((notification) => pushNotification(notification));
+    } catch (error) {
+      logger.error("Failed to load existing notifications on login", error && error.message ? error.message : error);
+    }
+  }
+
   onMount(() => {
     bootstrap();
     try {
-      const socketUrl = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
+      const socketUrl = BACKEND_ORIGIN;
       unsubscribeUser = user.subscribe((value) => {
         try {
           if (!value || !value.username) return;
+          clearNotifications();
+          loadExistingNotifications(value.id);
           if (navSocket && typeof navSocket.disconnect === "function") {
             try {
               navSocket.disconnect();
@@ -39,7 +97,7 @@
 
             navSocket.on("booking:created", (payload) => {
               try {
-                pushNotification({ type: "booking", ...payload });
+                pushNotification({ type: "booking", navTo: "/myresources", ...payload });
                 notifier.info("New booking request");
               } catch (error) {
                 logger.error("Failed to handle booking:created notification", error && error.message ? error.message : error);
@@ -47,7 +105,7 @@
             });
             navSocket.on("booking:confirmed", (payload) => {
               try {
-                pushNotification({ type: "booking:confirmed", ...payload });
+                pushNotification({ type: "booking:confirmed", navTo: "/mybookings", ...payload });
                 notifier.success("A booking was confirmed");
               } catch (error) {
                 logger.error("Failed to handle booking:confirmed notification", error && error.message ? error.message : error);
@@ -55,7 +113,7 @@
             });
             navSocket.on("booking:declined", (payload) => {
               try {
-                pushNotification({ type: "booking:declined", ...payload });
+                pushNotification({ type: "booking:declined", navTo: "/mybookings", ...payload });
                 notifier.error("A booking was declined");
               } catch (error) {
                 logger.error("Failed to handle booking:declined notification", error && error.message ? error.message : error);
@@ -122,12 +180,11 @@
       <a href="/" class="text-black-800 hover:text-black">Home</a>
       {#if $user}
         <a href="/profile" class="text-black-800 hover:text-black">Profile</a>
-        {#if $notificationCount > 0}
-          {#if $notifications.some((n) => n && (n.type === "booking:confirmed" || n.type === "booking:declined"))}
-            <a href="/mybookings" class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$notificationCount}</a>
-          {:else}
-            <a href="/myresources" class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$notificationCount}</a>
-          {/if}
+        {#if $resourceBookingCount > 0}
+          <a href="/myresources" class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$resourceBookingCount}</a>
+        {/if}
+        {#if $myBookingCount > 0}
+          <a href="/mybookings" class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$myBookingCount}</a>
         {/if}
         <a href="/settings" class="text-black-800 hover:text-black">Settings</a>
         <a href="/create" class="text-black-800 hover:text-black">Create a Resource</a>

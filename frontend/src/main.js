@@ -2,7 +2,7 @@ import { mount } from "svelte";
 import App from "./App.svelte";
 import "./styles.css";
 import logger from "./lib/logger";
-import "./lib/authGuard.js";
+import "./utils/authGuardUtils.js";
 
 try {
   if (typeof Node !== "undefined") {

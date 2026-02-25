@@ -16,6 +16,10 @@ export async function getSessionByCookieHeader(cookieHeader, sessionStore, logge
     if (!sessionId) return null;
     const store = sessionStore;
     if (!store || typeof store.get !== "function") return null;
+    // spørgsmål: hvorfor bruger vi en Promise her?
+    // Vi bruger en Promise her for at gøre den callback-baserede sessionStore.get-metode kompatibel med async/await-syntaksen.
+    // sessionStore.get forventer en callback-funktion, der kaldes med resultatet, men ved at indpakke det i en Promise kan vi bruge await for at vente på resultatet,
+    // hvilket gør koden mere læsbar og lettere at håndtere i tilfælde af fejl.
     return await new Promise((resolve) => {
       store.get(sessionId, (error, session) => {
         if (error) {

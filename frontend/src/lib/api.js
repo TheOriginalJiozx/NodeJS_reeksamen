@@ -14,7 +14,21 @@ export default async function apiFetch(input, options = {}) {
         });
       }
     }
-    return fetch(input, requestOptions);
+    const response = await fetch(input, requestOptions);
+    
+    if (response.status === 403 && method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+      logger.warn("CSRF token invalid, clearing cache and retrying");
+      clearCsrfCache();
+      const newToken = await fetchCsrf();
+      if (newToken) {
+        requestOptions.headers = Object.assign({}, requestOptions.headers || {}, {
+          "x-csrf-token": newToken,
+        });
+        return fetch(input, requestOptions);
+      }
+    }
+    
+    return response;
   } catch (error) {
     logger.error("apiFetch network error", error && error.message ? error.message : error);
     throw error;

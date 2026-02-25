@@ -31,8 +31,10 @@ export async function destroySessionIds(ids) {
   const store = global.sessionStore;
   if (!store || typeof store.destroy !== "function") return;
   // spørgsmål: hvorfor bruger vi Promise.all her?
-  // Vi bruger Promise.all her for at køre flere asynkrone operationer parallelt og vente på, at de alle er færdige.
-  // I dette tilfælde vil vi gerne ødelægge alle sessioner for en bruger samtidig, og ved at bruge Promise.all kan vi starte alle destroy-operationerne på samme tid,
+  // Vi bruger Promise.all her for at køre flere asynkrone operationer parallelt og vente på,
+  // at de alle er færdige.
+  // I dette tilfælde vil vi gerne ødelægge alle sessioner for en bruger samtidig,
+  // og ved at bruge Promise.all kan vi starte alle destroy-operationerne på samme tid,
   // hvilket kan være hurtigere end at vente på den første, før vi starter den anden.
   await Promise.all(ids.map((id) => new Promise((resource) => store.destroy(id, () => resource()))));
 }

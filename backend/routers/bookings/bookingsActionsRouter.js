@@ -6,8 +6,9 @@ import logger from "../../lib/logger.js";
 import * as resourceQueries from "../../db/queries/resources.js";
 
 const router = Router();
+const API = "/api";
 
-router.patch("/api/bookings/:id/confirm", isLoggedIn, async (req, res) => {
+router.patch(`${API}/bookings/:id/confirm`, isLoggedIn, async (req, res) => {
   try {
     const id = req.params.id;
     const bookingResult = await db.query(queries.selectBookingById, [id]);
@@ -50,7 +51,7 @@ router.patch("/api/bookings/:id/confirm", isLoggedIn, async (req, res) => {
   }
 });
 
-router.delete("/api/bookings/:id", isLoggedIn, async (req, res) => {
+router.delete(`${API}/bookings/:id`, isLoggedIn, async (req, res) => {
   try {
     const id = req.params.id;
     const bookingResult = await db.query(queries.selectBookingById, [id]);
@@ -65,21 +66,6 @@ router.delete("/api/bookings/:id", isLoggedIn, async (req, res) => {
     const normalizedUsername = String(username).trim().toLowerCase();
     const normalizedBooker = String(booking.booker).trim().toLowerCase();
     const normalizedResourceOwner = String(resourceOwner).trim().toLowerCase();
-
-    logger.debug(
-      {
-        username,
-        normalizedUsername,
-        bookingBooker: booking.booker,
-        normalizedBooker,
-        resourceOwner,
-        normalizedResourceOwner,
-        matchBooker: normalizedUsername === normalizedBooker,
-        matchOwner: normalizedUsername === normalizedResourceOwner,
-        bookingId: id
-      },
-      "DELETE /api/bookings/:id - normalized comparison"
-    );
 
     if (normalizedUsername !== normalizedBooker && normalizedUsername !== normalizedResourceOwner) {
       logger.warn({ username, bookingBooker: booking.booker, resourceOwner, bookingId: id }, "Forbidden delete attempt");
