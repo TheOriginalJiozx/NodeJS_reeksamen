@@ -10,6 +10,7 @@ import { Server } from "socket.io";
 import http from "http";
 import authRouter from "./routers/users/authRouter.js";
 import usersRouter from "./routers/users/usersRouter.js";
+import usersUpdateRouter from "./routers/users/usersUpdateRouter.js";
 import usersExportRouter from "./routers/users/usersExportRouter.js";
 import bookingsRouter from "./routers/bookings/bookingsRouter.js";
 import bookingsActionsRouter from "./routers/bookings/bookingsActionsRouter.js";
@@ -18,6 +19,7 @@ import typesRouter from "./routers/types/typesRouter.js";
 import uploadsRouter from "./routers/uploads/uploadsRouter.js";
 import initializeSocket from "./utils/socketUtils.js";
 import csrfMiddleware from "./middleware/csrfMiddleware.js";
+import dependencyInjectionMiddleware from "./middleware/dependencyInjectionMiddleware.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
 const NODE_ENV = process.env.NODE_ENV || "development";
@@ -97,6 +99,7 @@ app.get("/api/csrf-token", (req, res) => {
 
 app.use(authRouter);
 app.use(usersRouter);
+app.use(usersUpdateRouter);
 app.use(usersExportRouter);
 app.use(bookingsRouter);
 app.use(bookingsActionsRouter);
@@ -133,13 +136,8 @@ const io = new Server(server, {
   },
 });
 
-// Kun brug global for io og sessionStore, da de skal bruges på tværs af routers og socket initialization kræver adgang til session store.
-// Disse kan ikke undgås uden større refactoring, da routers skal kunne emit events og socket initialization skal have adgang til session store.
-// og socket initialization kræver adgang til session store.
-// I produktion, sørg for at MySQL session store er initialiseret før server start.
-
-global.io = io;
-global.sessionStore = sessionStore;
+// Injicer afhængigheder i request-objektet efter io er oprettet
+app.use(dependencyInjectionMiddleware(io, sessionStore));
 
 initializeSocket(io, sessionStore, logger);
 

@@ -7,7 +7,6 @@ import { allowSelfOrAdmin } from "../../auth/authorization.js";
 import logger from "../../lib/logger.js";
 import fs from "fs";
 import path from "path";
-import auth from "../../utils/authorizerUtils.js";
 import { collectSessionIdsForUsername, destroySessionIds } from "../../utils/sessionUtils.js";
 
 const router = Router();
@@ -58,7 +57,7 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
       if (userHasBookings?.rowCount > 0) {
         await db.query(userQueries.reserveUsername, [username]);
       }
-      
+
       await db.query("COMMIT");
     } catch (transactionError) {
       try {
@@ -69,8 +68,8 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
       throw transactionError;
     }
 
-    const sessionIds = await collectSessionIdsForUsername(username);
-    await destroySessionIds(sessionIds);
+    const sessionIds = await collectSessionIdsForUsername(req.sessionStore, username);
+    await destroySessionIds(req.sessionStore, sessionIds);
 
     for (const resourceImage of resourceImages) {
       if (!resourceImage || !String(resourceImage).includes(`${API}uploads/`)) continue;
@@ -93,82 +92,6 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
     return res.status(200).json({ message: "User account and related resources deleted successfully" });
   } catch (error) {
     return sendServerError(res, "DELETE /api/users/:id error", error);
-  }
-});
-
-router.patch(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
-  const idParameter = req.params.id;
-  if (!isValidId(idParameter)) return res.status(400).json({ message: "Invalid user id" });
-
-  try {
-    let { newUsername, newFullName, currentPassword, newPassword, confirmNewPassword } = req.body || {};
-    newFullName = newFullName ? String(newFullName).trim() : null;
-    if (!newUsername && !newFullName && !newPassword) return res.status(400).json({ message: "No changes provided" });
-
-    const userRow = await db.query(userQueries.selectUserById, [idParameter]);
-    const existing = userRow.rows?.[0];
-    if (!existing) return res.status(404).json({ message: "User not found" });
-
-    if (newUsername && newUsername !== existing.username) {
-      if (!/^[A-Za-z0-9_]+$/.test(newUsername)) return res.status(400).json({ message: "Username may only contain letters, numbers and underscores" });
-      const taken = await db.query(userQueries.findUserByUsername, [newUsername]);
-      if (taken.rowCount > 0 && String(taken.rows[0].id) !== String(idParameter)) return res.status(409).json({ message: "Username already in use" });
-
-      const oldUsername = existing.username;
-      
-      try {
-        await db.query("START TRANSACTION");
-        await db.query(userQueries.updateUsername, [newUsername, idParameter]);
-        await db.query(userQueries.updateBookingsBooker, [newUsername, oldUsername]);
-        await db.query(userQueries.updateResourcesOwner, [newUsername, oldUsername]);
-        await db.query("COMMIT");
-      } catch (transactionError) {
-        try {
-          await db.query("ROLLBACK");
-        } catch (rollbackError) {
-          logger.error(rollbackError, "Failed rollback after username update error");
-        }
-        return sendServerError(res, "PATCH /api/users/:id username transaction error", transactionError);
-      }
-
-      try {
-        if (req.session?.user?.id && String(req.session.user.id) === String(idParameter)) req.session.user.username = newUsername;
-      } catch (error) {
-        logger.debug("Could not update session username after change", error);
-      }
-
-      try {
-        const ids = await collectSessionIdsForUsername(oldUsername);
-        await destroySessionIds(ids);
-      } catch (error) {
-        logger.debug("Could not update other sessions after username change", error);
-      }
-    }
-
-    if (newFullName && newFullName !== existing.fullname) {
-      if (!/^[A-Za-z0-9\s-]+$/.test(newFullName)) return res.status(400).json({ message: "Fullname may only contain letters, numbers, spaces and hyphens" });
-      await db.query(userQueries.updateFullName, [newFullName, idParameter]);
-      try {
-        if (req.session?.user?.id && String(req.session.user.id) === String(idParameter)) req.session.user.fullname = newFullName;
-      } catch (error) {
-        logger.debug("Could not update session fullname after change", error);
-      }
-    }
-
-    if (newPassword) {
-      if (!currentPassword) return res.status(400).json({ message: "Current password required" });
-      if (!confirmNewPassword) return res.status(400).json({ message: "Please confirm new password" });
-      if (newPassword !== confirmNewPassword) return res.status(400).json({ message: "Passwords do not match" });
-      const loginRow = await db.query(userQueries.selectUserForLogin, [existing.username]);
-      const stored = loginRow.rows?.[0]?.passwordHash || null;
-      if (!auth.validatePassword(currentPassword, stored)) return res.status(403).json({ message: "Current password incorrect" });
-      const hashed = auth.encryptPassword(newPassword);
-      await db.query(userQueries.updatePasswordHash, [hashed, idParameter]);
-    }
-
-    return res.status(200).json({ message: "Account updated" });
-  } catch (error) {
-    return sendServerError(res, "PATCH /api/users/:id error", error);
   }
 });
 

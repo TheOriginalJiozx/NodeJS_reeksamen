@@ -1,5 +1,5 @@
-export async function collectSessionIdsForUsername(username) {
-  const store = global.sessionStore;
+export async function collectSessionIdsForUsername(sessionStore, username) {
+  const store = sessionStore;
   if (!store || typeof store.all !== "function") return [];
   // spørgsmål: hvorfor bruger vi en Promise her?
   // Vi bruger en Promise her for at gøre den callback-baserede sessionStore.all-metode kompatibel med async/await-syntaksen.
@@ -26,9 +26,9 @@ export async function collectSessionIdsForUsername(username) {
   });
 }
 
-export async function destroySessionIds(ids) {
+export async function destroySessionIds(sessionStore, ids) {
   if (!ids.length) return;
-  const store = global.sessionStore;
+  const store = sessionStore;
   if (!store || typeof store.destroy !== "function") return;
   // spørgsmål: hvorfor bruger vi Promise.all her?
   // Vi bruger Promise.all her for at køre flere asynkrone operationer parallelt og vente på,

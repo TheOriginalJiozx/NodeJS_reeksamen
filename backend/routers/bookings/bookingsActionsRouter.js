@@ -33,10 +33,10 @@ router.patch(`${API}/bookings/:id/confirm`, isLoggedIn, async (req, res) => {
     await db.query(queries.confirmBookingById, [id]);
 
     try {
-      if (global.io) global.io.to(`resource:${booking.resourceId}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resourceId });
+      if (req.io) req.io.to(`resource:${booking.resourceId}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resourceId });
       try {
         const booker = booking.booker;
-        if (booker && global.io) global.io.to(`user:${booker}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resourceId });
+        if (booker && req.io) req.io.to(`user:${booker}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resourceId });
       } catch (error) {
         logger.debug("Failed to emit booking:confirmed to booker", error && error.message ? error.message : error);
       }
@@ -76,9 +76,9 @@ router.delete(`${API}/bookings/:id`, isLoggedIn, async (req, res) => {
       const updated = await db.query(queries.declineBookingById, [id]);
       logger.info({ bookingId: id, rowsAffected: updated.rowCount }, "Booking declined (marked)");
       try {
-        if (global.io) {
-          global.io.to(`resource:${booking.resourceId}`).emit("booking:declined", { bookingId: id, resourceId: booking.resourceId });
-          global.io.to(`user:${booking.booker}`).emit("booking:declined", { bookingId: id, resourceId: booking.resourceId });
+        if (req.io) {
+          req.io.to(`resource:${booking.resourceId}`).emit("booking:declined", { bookingId: id, resourceId: booking.resourceId });
+          req.io.to(`user:${booking.booker}`).emit("booking:declined", { bookingId: id, resourceId: booking.resourceId });
         }
       } catch (error) {
         logger.warn("Failed to emit booking:declined", error && error.message ? error.message : error);
@@ -91,8 +91,8 @@ router.delete(`${API}/bookings/:id`, isLoggedIn, async (req, res) => {
     logger.info({ bookingId: id, rowsAffected: deleteBooking.rowCount }, "Booking deleted");
 
     try {
-      if (global.io)
-        global.io.to(`resource:${booking.resourceId}`).emit("booking:deleted", {
+      if (req.io)
+        req.io.to(`resource:${booking.resourceId}`).emit("booking:deleted", {
           bookingId: id,
           resourceId: booking.resourceId,
         });

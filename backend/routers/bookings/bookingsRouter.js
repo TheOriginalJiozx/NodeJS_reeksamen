@@ -87,10 +87,10 @@ async function createBookingTransaction(booker, resourceId, startDate, endDate, 
   return { insertId, resourceImage };
 }
 
-function emitBookingCreatedEvents(resourceId, startDate, endDate, bookingId, resourceImage) {
+function emitBookingCreatedEvents(io, resourceId, startDate, endDate, bookingId, resourceImage) {
   try {
-    if (global.io) {
-      global.io.to(`resource:${resourceId}`).emit("booking:created", {
+    if (io) {
+      io.to(`resource:${resourceId}`).emit("booking:created", {
         resourceId,
         startDate,
         endDate,
@@ -105,8 +105,8 @@ function emitBookingCreatedEvents(resourceId, startDate, endDate, bookingId, res
   db.query(resourceQueries.selectResourceOwner, [resourceId])
     .then((ownerRes) => {
       const owner = ownerRes.rowCount && ownerRes.rows[0] ? ownerRes.rows[0].owner : null;
-      if (owner && global.io) {
-        global.io.to(`user:${owner}`).emit("booking:created", {
+      if (owner && io) {
+        io.to(`user:${owner}`).emit("booking:created", {
           resourceId,
           startDate,
           endDate,
@@ -156,7 +156,7 @@ router.post(`${API}/bookings`, authLimiter, isLoggedIn, async (req, res) => {
 
     const { insertId, resourceImage } = await createBookingTransaction(booker, resourceId, startDate, endDate, comment);
 
-    emitBookingCreatedEvents(resourceId, startDate, endDate, insertId, resourceImage);
+    emitBookingCreatedEvents(req.io, resourceId, startDate, endDate, insertId, resourceImage);
 
     return res.status(201).json({ message: "Booking created", bookingId: insertId, resourceImage });
   } catch (error) {

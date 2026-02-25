@@ -71,7 +71,7 @@ router.post(`${API}/resources`, isLoggedIn, async (req, res) => {
     }
 
     try {
-      global.io?.emit?.("resource:created", { id: insertId, name, type: typeName, owner });
+      req.io?.emit?.("resource:created", { id: insertId, name, type: typeName, owner });
     } catch (error) {
       logger.warn("Emit resource:created failed", error);
     }
@@ -123,7 +123,7 @@ router.post(`${API}/resources/:id/availabilities`, isLoggedIn, async (req, res) 
     }
 
     try {
-      global.io?.to?.(`resource:${id}`)?.emit?.("availability:changed", { resourceId: id, startDate, endDate, id: insertId });
+      req.io?.to?.(`resource:${id}`)?.emit?.("availability:changed", { resourceId: id, startDate, endDate, id: insertId });
     } catch (error) {
       logger.warn("Emit availability failed", error);
     }
@@ -166,7 +166,7 @@ router.delete(`${API}/resources/:id/availabilities/:availabilityId`, isLoggedIn,
     }
 
     try {
-      global.io?.to(`resource:${resourceId}`)?.emit?.("availability:changed", { resourceId });
+      req.io?.to(`resource:${resourceId}`)?.emit?.("availability:changed", { resourceId });
     } catch (error) {
       logger.warn("Emit availability failed", error);
     }
@@ -201,7 +201,7 @@ router.delete(`${API}/resources/:id`, isLoggedIn, async (req, res) => {
 
     deleteUploadFile(resourceImage);
     try {
-      global.io?.emit?.("resource:deleted", { id });
+      req.io?.emit?.("resource:deleted", { id });
     } catch (error) {
       logger.warn("Emit resource:deleted failed", error);
     }
