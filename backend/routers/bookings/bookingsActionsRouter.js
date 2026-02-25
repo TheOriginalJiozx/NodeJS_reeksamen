@@ -33,12 +33,21 @@ router.patch(`${API}/bookings/:id/confirm`, isLoggedIn, async (req, res) => {
     await db.query(queries.confirmBookingById, [id]);
 
     try {
-      if (req.io) req.io.to(`resource:${booking.resourceId}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resourceId });
-      try {
+      if (req.io && booking.resource_id) {
+        logger.debug({ bookingId: id, booker: booking.booker, resourceId: booking.resource_id }, "Emitting booking:confirmed");
+        req.io.to(`resource:${booking.resource_id}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resource_id });
         const booker = booking.booker;
-        if (booker && req.io) req.io.to(`user:${booker}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resourceId });
-      } catch (error) {
-        logger.debug("Failed to emit booking:confirmed to booker", error && error.message ? error.message : error);
+        if (booker && req.io) {
+          req.io.to(`user:${booker}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resource_id });
+          logger.debug({ booker }, "Emitted to booker user room");
+        }
+        const owner = resourceOwner;
+        if (owner && req.io && String(owner) !== String(booker)) {
+          req.io.to(`user:${owner}`).emit("booking:confirmed", { bookingId: id, resourceId: booking.resource_id });
+          logger.debug({ owner }, "Emitted to owner user room");
+        }
+      } else {
+        logger.warn({ io: !!req.io, resourceId: booking.resource_id }, "Cannot emit - missing io or resourceId");
       }
     } catch (error) {
       logger.warn("Failed to emit booking:confirmed", error && error.message ? error.message : error);
@@ -76,9 +85,13 @@ router.delete(`${API}/bookings/:id`, isLoggedIn, async (req, res) => {
       const updated = await db.query(queries.declineBookingById, [id]);
       logger.info({ bookingId: id, rowsAffected: updated.rowCount }, "Booking declined (marked)");
       try {
-        if (req.io) {
-          req.io.to(`resource:${booking.resourceId}`).emit("booking:declined", { bookingId: id, resourceId: booking.resourceId });
-          req.io.to(`user:${booking.booker}`).emit("booking:declined", { bookingId: id, resourceId: booking.resourceId });
+        if (req.io && booking.booker) {
+          logger.debug({ bookingId: id, booker: booking.booker, resourceId: booking.resource_id }, "Emitting booking:declined to booker only");
+          req.io.to(`resource:${booking.resource_id}`).emit("booking:declined", { bookingId: id, resourceId: booking.resource_id });
+          req.io.to(`user:${booking.booker}`).emit("booking:declined", { bookingId: id, resourceId: booking.resource_id });
+          logger.debug({ booker: booking.booker }, "Emitted to booker user room");
+        } else {
+          logger.warn({ io: !!req.io, booker: booking.booker }, "Cannot emit - missing io or booker");
         }
       } catch (error) {
         logger.warn("Failed to emit booking:declined", error && error.message ? error.message : error);
@@ -91,11 +104,27 @@ router.delete(`${API}/bookings/:id`, isLoggedIn, async (req, res) => {
     logger.info({ bookingId: id, rowsAffected: deleteBooking.rowCount }, "Booking deleted");
 
     try {
-      if (req.io)
-        req.io.to(`resource:${booking.resourceId}`).emit("booking:deleted", {
+      if (req.io && booking.booker && booking.resource_id) {
+        logger.debug({ bookingId: id, booker: booking.booker, resourceId: booking.resource_id, owner: resourceOwner }, "Emitting booking:deleted");
+        req.io.to(`resource:${booking.resource_id}`).emit("booking:deleted", {
           bookingId: id,
-          resourceId: booking.resourceId,
+          resourceId: booking.resource_id,
         });
+        req.io.to(`user:${booking.booker}`).emit("booking:deleted", {
+          bookingId: id,
+          resourceId: booking.resource_id,
+        });
+        logger.debug({ booker: booking.booker }, "Emitted to booker user room");
+        if (String(resourceOwner) !== String(booking.booker)) {
+          req.io.to(`user:${resourceOwner}`).emit("booking:deleted", {
+            bookingId: id,
+            resourceId: booking.resource_id,
+          });
+          logger.debug({ owner: resourceOwner }, "Emitted to owner user room");
+        }
+      } else {
+        logger.warn({ io: !!req.io, booker: booking.booker, resourceId: booking.resource_id }, "Cannot emit - missing io, booker, or resourceId");
+      }
     } catch (error) {
       logger.warn("Failed to emit booking:deleted", error && error.message ? error.message : error);
     }

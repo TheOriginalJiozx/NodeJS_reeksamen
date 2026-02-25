@@ -15,7 +15,7 @@ const sendServerError = (res, tag, error) => {
   return res.status(500).json({ message: "Internal server error" });
 };
 
-router.post(`${API}/users/export`, isLoggedIn, async (req, res) => {
+router.get(`${API}/users/export`, isLoggedIn, async (req, res) => {
   const userId = req.user?.id;
   if (!userId) return res.status(400).json({ message: "Invalid user" });
   try {

@@ -2,9 +2,9 @@
   import { onMount, onDestroy } from "svelte";
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
-  import { fetchAvailability } from "../../fetcher/bookingFetchers.js";
+  import { fetchAvailability } from "../../fetchers/bookingFetchers.js";
   import apiFetch from "../../lib/api.js";
-  import { handleAddAvailability } from "../../handler/bookingHandlers.js";
+  import { handleAddAvailability } from "../../handlers/bookingHandlers.js";
   import notifier from "../../lib/notifier.js";
   import { today, contiguousEndDates } from "../../utils/bookingUtils.js";
   import logger from "../../lib/logger.js";

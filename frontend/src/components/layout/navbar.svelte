@@ -8,7 +8,7 @@
   import { clearAuth } from "../../lib/authentication.js";
   import logger from "../../lib/logger.js";
   import { loadResourcesWithBookingsAndAvailability } from "../../handlers/resourceHandlers.js";
-  import { fetchUserBookings } from "../../fetchers/bookingHandlers.js";
+  import { fetchUserBookings } from "../../fetchers/bookingFetchers.js";
 
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
@@ -89,14 +89,25 @@
             navSocket = globalThis.io(socketUrl, { withCredentials: true });
             navSocket.on("connect", () => {
               try {
+                logger.info("Nav socket connected");
                 navSocket.emit("joinUser", { username: value.username });
+                logger.info({ username: value.username }, "Emitted joinUser");
               } catch (error) {
                 logger.error("Failed to emit joinUser on nav socket connection", error && error.message ? error.message : error);
               }
             });
 
+            navSocket.on("disconnect", () => {
+              logger.warn("Nav socket disconnected");
+            });
+
+            navSocket.on("connect_error", (error) => {
+              logger.error("Nav socket connection error", error);
+            });
+
             navSocket.on("booking:created", (payload) => {
               try {
+                logger.debug({ payload }, "Received booking:created");
                 pushNotification({ type: "booking", navTo: "/myresources", ...payload });
                 notifier.info("New booking request");
               } catch (error) {
@@ -105,6 +116,7 @@
             });
             navSocket.on("booking:confirmed", (payload) => {
               try {
+                logger.debug({ payload }, "Received booking:confirmed");
                 pushNotification({ type: "booking:confirmed", navTo: "/mybookings", ...payload });
                 notifier.success("A booking was confirmed");
               } catch (error) {
@@ -113,6 +125,7 @@
             });
             navSocket.on("booking:declined", (payload) => {
               try {
+                logger.debug({ payload }, "Received booking:declined");
                 pushNotification({ type: "booking:declined", navTo: "/mybookings", ...payload });
                 notifier.error("A booking was declined");
               } catch (error) {
@@ -180,12 +193,18 @@
       <a href="/" class="text-black-800 hover:text-black">Home</a>
       {#if $user}
         <a href="/profile" class="text-black-800 hover:text-black">Profile</a>
-        {#if $resourceBookingCount > 0}
-          <a href="/myresources" class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$resourceBookingCount}</a>
-        {/if}
-        {#if $myBookingCount > 0}
-          <a href="/mybookings" class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$myBookingCount}</a>
-        {/if}
+        <a href="/myresources" class="text-black-800 hover:text-black">
+          My Resources
+          {#if $resourceBookingCount > 0}
+            <span class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$resourceBookingCount}</span>
+          {/if}
+        </a>
+        <a href="/mybookings" class="text-black-800 hover:text-black">
+          My Bookings
+          {#if $myBookingCount > 0}
+            <span class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$myBookingCount}</span>
+          {/if}
+        </a>
         <a href="/settings" class="text-black-800 hover:text-black">Settings</a>
         <a href="/create" class="text-black-800 hover:text-black">Create a Resource</a>
         <a href="/book" class="text-black-800 hover:text-black">Book</a>

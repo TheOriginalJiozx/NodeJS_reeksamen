@@ -17,9 +17,9 @@ import bookingsActionsRouter from "./routers/bookings/bookingsActionsRouter.js";
 import resourcesRouter from "./routers/resources/resourcesRouter.js";
 import typesRouter from "./routers/types/typesRouter.js";
 import uploadsRouter from "./routers/uploads/uploadsRouter.js";
+import carBrandsRouter from "./routers/carBrands/carBrandsRouter.js";
 import initializeSocket from "./utils/socketUtils.js";
 import csrfMiddleware from "./middleware/csrfMiddleware.js";
-import dependencyInjectionMiddleware from "./middleware/dependencyInjectionMiddleware.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
 const NODE_ENV = process.env.NODE_ENV || "development";
@@ -97,6 +97,18 @@ app.get("/api/csrf-token", (req, res) => {
   }
 });
 
+let io;
+
+const dependencyInjector = (req, res, next) => {
+  if (io) {
+    req.io = io;
+    req.sessionStore = sessionStore;
+  }
+  next();
+};
+
+app.use(dependencyInjector);
+
 app.use(authRouter);
 app.use(usersRouter);
 app.use(usersUpdateRouter);
@@ -106,6 +118,7 @@ app.use(bookingsActionsRouter);
 app.use(resourcesRouter);
 app.use(typesRouter);
 app.use(uploadsRouter);
+app.use(carBrandsRouter);
 
 app.use((req, res) => {
   logger.warn(`404 Not Found: ${req.method} ${req.path}`);
@@ -129,15 +142,12 @@ app.use((error, req, res, next) => {
 });
 
 const server = http.createServer(app);
-const io = new Server(server, {
+io = new Server(server, {
   cors: {
     origin: FRONTEND_ORIGIN,
     credentials: true,
   },
 });
-
-// Injicer afhængigheder i request-objektet efter io er oprettet
-app.use(dependencyInjectionMiddleware(io, sessionStore));
 
 initializeSocket(io, sessionStore, logger);
 

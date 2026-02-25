@@ -61,4 +61,21 @@ CREATE TABLE IF NOT EXISTS reserved_usernames (
   PRIMARY KEY (id),
   UNIQUE KEY username_UNIQUE (username)
 );
+
+CREATE TABLE IF NOT EXISTS car_brands (
+  id INT NOT NULL AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY name (name)
+);
+
+CREATE TABLE IF NOT EXISTS car_models (
+  id INT NOT NULL AUTO_INCREMENT,
+  brand_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_car_models_brand (brand_id),
+  UNIQUE KEY unique_brand_model (brand_id, name),
+  CONSTRAINT fk_car_models_brand FOREIGN KEY (brand_id) REFERENCES car_brands (id) ON DELETE CASCADE
+);
 `;

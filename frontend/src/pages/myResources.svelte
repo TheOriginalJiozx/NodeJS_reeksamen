@@ -7,7 +7,7 @@
   import ResourceTable from "../components/resources/resourceTable.svelte";
   import { initializeSocket, disconnectSocket } from "../utils/socketUtils.js";
   import { loadAuthenticatedUser } from "../utils/authUtils.js";
-  import { confirmBooking, declineBooking, deleteResource, deleteAvailability, loadResourcesWithBookingsAndAvailability } from "../handler/resourceHandlers.js";
+  import { confirmBooking, declineBooking, deleteResource, deleteAvailability, loadResourcesWithBookingsAndAvailability } from "../handlers/resourceHandlers.js";
 
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 

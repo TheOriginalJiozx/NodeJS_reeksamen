@@ -1,7 +1,7 @@
 import apiFetch from "../lib/api.js";
 import { removeNotificationsByBookingId } from "../store/notificationsStore.js";
 import notifier from "../lib/notifier.js";
-import { fetchAvailability } from "../fetcher/bookingFetchers.js";
+import { fetchAvailability } from "../fetchers/bookingFetchers.js";
 import logger from "../lib/logger.js";
 import { toast } from "../store/toastStore.js";
 

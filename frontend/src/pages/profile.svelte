@@ -135,8 +135,6 @@
                 <div class="ml-3 text-sm bg-yellow-200 text-yellow-800 px-2 py-1 rounded">Admin</div>
               {/if}
             </div>
-            <button class="bg-blue-600 text-white px-3 py-1 rounded" on:click={() => navigate("/mybookings")}>My bookings</button>
-            <button class="bg-blue-600 text-white px-3 py-1 rounded" on:click={() => navigate("/myresources")}>My resources</button>
             <button class="bg-red-600 text-white px-3 py-1 rounded" on:click|preventDefault={deleteAccount} disabled={deleting}>
               {#if deleting}Deleting...{:else}Delete account{/if}
             </button>

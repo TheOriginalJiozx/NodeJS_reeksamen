@@ -1,10 +1,10 @@
 <script>
   import { onMount } from "svelte";
-  import { fetchTypes, fetchAllResources } from "../../fetcher/bookingFetchers.js";
+  import { fetchTypes, fetchAllResources } from "../../fetchers/bookingFetchers.js";
   import apiFetch from "../../lib/api.js";
   import CarFields from "./carFields.svelte";
   import ImageUploader from "./imageUploader.svelte";
-  import { handleCreate } from "../../handler/bookingHandlers.js";
+  import { handleCreate } from "../../handlers/bookingHandlers.js";
   import logger from "../../lib/logger.js";
   import { getCachedUser } from "../../utils/authUtils.js";
 

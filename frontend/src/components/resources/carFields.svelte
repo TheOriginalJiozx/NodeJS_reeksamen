@@ -1,4 +1,8 @@
 <script>
+  import { onMount } from "svelte";
+  import apiFetch from "../../lib/api.js";
+  import logger from "../../lib/logger.js";
+
   export let createBrand = "";
   export let createModel = "";
   export let createBrandOther = "";
@@ -7,23 +11,54 @@
   export let createYear = "";
   export let years = [];
 
-  const brandModels = {
-    Toyota: ["Yaris", "Corolla", "Prius", "Camry"],
-    Ford: ["Fiesta", "Focus", "Mustang"],
-    BMW: ["3 Series", "5 Series", "X3", "X5"],
-    Mercedes: ["A-Class", "C-Class", "E-Class"],
-    Volkswagen: ["Golf", "Polo", "Passat"],
-    Honda: ["Civic", "Accord", "Jazz"],
-  };
+  let brands = [];
+  let models = [];
+  let loading = false;
 
-  $: modelsForBrand = createBrand && brandModels[createBrand] ? brandModels[createBrand] : [];
+  onMount(async () => {
+    try {
+      loading = true;
+      const response = await apiFetch("/api/car-brands");
+      const brandsData = response.ok ? await response.json() : [];
+      brands = brandsData || [];
+      logger.debug({ brandsCount: brands.length }, "Loaded car brands");
+    } catch (error) {
+      logger.error("Failed to load car brands", error && error.message ? error.message : error);
+    } finally {
+      loading = false;
+    }
+  });
+
+  async function loadModelsForBrand(brandId) {
+    if (!brandId) {
+      models = [];
+      return;
+    }
+    try {
+      const response = await apiFetch(`/api/car-brands/${brandId}/models`);
+      const modelsData = response.ok ? await response.json() : [];
+      models = modelsData || [];
+      logger.debug({ brandId, modelsCount: models.length }, "Loaded car models for brand");
+    } catch (error) {
+      logger.error("Failed to load car models", error && error.message ? error.message : error);
+      models = [];
+    }
+  }
+
+  $: if (createBrand && createBrand !== "Other") {
+    loadModelsForBrand(createBrand);
+  } else {
+    models = [];
+  }
+
+  $: modelsForBrand = models.map(model => model.name) || [];
 </script>
 
 <div class="grid grid-cols-3 gap-2">
-  <select class="border rounded p-2" bind:value={createBrand}>
+  <select class="border rounded p-2" bind:value={createBrand} disabled={loading}>
       <option value="">Brand</option>
-      {#each Object.keys(brandModels) as brand}
-        <option value={brand}>{brand}</option>
+      {#each brands as brand}
+        <option value={brand.id}>{brand.name}</option>
       {/each}
       <option value="Other">Other</option>
     </select>
@@ -42,7 +77,7 @@
       {#if createModelSelect === 'Other'}
         <input class="border rounded p-2" placeholder="Model" bind:value={createModelCustom} />
       {/if}
-    {:else}
+    {:else if createBrand && createBrand !== "Other"}
       <input class="border rounded p-2" placeholder="Model" bind:value={createModel} />
     {/if}
 
