@@ -10,7 +10,7 @@ const SOCKET_EVENTS = [
   "booking:declined",
 ];
 
-export function initializeSocket(backendOrigin, username, onEventFired) {
+function initializeSocket(backendOrigin, username, onEventFired) {
   try {
     if (typeof globalThis.io !== "function") {
       logger.warn("Socket.io not available");
@@ -28,9 +28,25 @@ export function initializeSocket(backendOrigin, username, onEventFired) {
       });
     });
 
-    if (username) {
-      socket.emit("joinUser", { username });
-      logger.debug(`Joined user room: ${username}`);
+    const emitJoinUser = () => {
+      if (username) {
+        try {
+          socket.emit("joinUser", { username });
+          logger.debug(`Emitted joinUser for: ${username}`);
+        } catch (error) {
+          logger.error("Failed to emit joinUser", error && error.message ? error.message : error);
+        }
+      }
+    };
+
+    socket.on("connect", () => {
+      logger.debug("Socket connected, emitting joinUser");
+      emitJoinUser();
+    });
+
+    if (socket.connected) {
+      logger.debug("Socket already connected, emitting joinUser immediately");
+      emitJoinUser();
     }
 
     logger.info("Socket initialized successfully");
@@ -41,7 +57,7 @@ export function initializeSocket(backendOrigin, username, onEventFired) {
   }
 }
 
-export function disconnectSocket(socket) {
+function disconnectSocket(socket) {
   try {
     if (socket && typeof socket.disconnect === "function") {
       socket.disconnect();
@@ -52,20 +68,28 @@ export function disconnectSocket(socket) {
   }
 }
 
-export function getAvailableSocketEvents() {
+function getAvailableSocketEvents() {
   return [...SOCKET_EVENTS];
 }
 
-export function joinResourceRoom(socket, resourceId) {
+function joinResourceRoom(socket, resourceId) {
   if (socket && typeof socket.emit === "function") {
     socket.emit("joinResource", { resourceId });
     logger.debug(`Joined resource room: ${resourceId}`);
   }
 }
 
-export function leaveResourceRoom(socket, resourceId) {
+function leaveResourceRoom(socket, resourceId) {
   if (socket && typeof socket.emit === "function") {
     socket.emit("leaveResource", { resourceId });
     logger.debug(`Left resource room: ${resourceId}`);
   }
 }
+
+export default {
+  initializeSocket,
+  disconnectSocket,
+  getAvailableSocketEvents,
+  joinResourceRoom,
+  leaveResourceRoom,
+};

@@ -1,24 +1,24 @@
 import { get } from "svelte/store";
-import user, { setUser, clearUser, bootstrap } from "../store/usersStore.js";
+import { authUser, setUser, clearUser, bootstrap } from "../store/usersStore.js";
 import logger from "./logger.js";
 
-export function setAuth(userObject) {
+function setAuth(userObject) {
   setUser(userObject);
 }
 
-export function clearAuth() {
+function clearAuth() {
   clearUser();
 }
 
-export function getAuth() {
-  return get(user);
+function getAuth() {
+  return get(authUser);
 }
 
-export function subscribeAuth(callback) {
-  return user.subscribe(callback);
+function subscribeAuth(callback) {
+  return authUser.subscribe(callback);
 }
 
-export async function ensureBootstrap() {
+async function ensureBootstrap() {
   try {
     await bootstrap();
   } catch (error) {
@@ -26,8 +26,7 @@ export async function ensureBootstrap() {
       error && error.message ? error.message : error,
     );
   }
-  return get(user);
+  return get(authUser);
 }
 
-const authentication = { setAuth, clearAuth, getAuth, subscribeAuth, ensureBootstrap };
-export default authentication;
+export { setAuth, clearAuth, getAuth, subscribeAuth, ensureBootstrap };

@@ -8,7 +8,7 @@ dotenv.config();
 export default defineConfig({
   plugins: [tailwindcss(), svelte()],
   define: {
-    "import.meta.env.VITE_BACKEND_ORIGIN": JSON.stringify(process.env.BACKEND_ORIGIN || ""),
+    "import.meta.env.VITE_BACKEND_ORIGIN": JSON.stringify(process.env.BACKEND_ORIGIN),
   },
   server: {
     proxy: {

@@ -1,11 +1,10 @@
-import apiFetch from "../lib/api.js";
+import { apiFetch } from "../lib/api.js";
 import { removeNotificationsByBookingId } from "../store/notificationsStore.js";
 import notifier from "../lib/notifier.js";
-import { fetchAvailability } from "../fetchers/bookingFetchers.js";
+import fetchers from "../fetchers/bookingFetchers.js";
 import logger from "../lib/logger.js";
-import { toast } from "../store/toastStore.js";
 
-export async function fetchBookingsFor(resourceId) {
+async function fetchBookingsFor(resourceId) {
   try {
     const res = await apiFetch(`/api/bookings?resourceId=${resourceId}`, { credentials: "include" });
     if (!res.ok) return [];
@@ -17,20 +16,14 @@ export async function fetchBookingsFor(resourceId) {
   }
 }
 
-export async function loadResourcesWithBookingsAndAvailability(userId) {
+async function loadResourcesWithBookingsAndAvailability(userId) {
   try {
     if (!userId) return { resources: [], resourceBookings: {}, resourceAvailabilities: {} };
     const res = await apiFetch(`/api/users/${userId}/resources`);
     if (!res.ok) return { resources: [], resourceBookings: {}, resourceAvailabilities: {} };
     const resources = await res.json();
-    // spørgsmål: hvorfor bruger vi Promise.all her?
-    // Vi bruger Promise.all her for at køre flere asynkrone operationer parallelt og vente på,
-    // at de alle er færdige.
-    // I dette tilfælde vil vi gerne hente både bookinger og tilgængeligheder for alle ressourcer samtidig,
-    // og ved at bruge Promise.all kan vi starte alle forespørgslerne på samme tid,
-    // hvilket kan være hurtigere end at vente på den første, før vi starter den anden.
     const bookingsList = await Promise.all(resources.map((resource) => fetchBookingsFor(resource.id)));
-    const availableList = await Promise.all(resources.map((resource) => fetchAvailability(resource.id)));
+    const availableList = await Promise.all(resources.map((resource) => fetchers.fetchAvailability(resource.id)));
     const resourceBookings = {};
     const resourceAvailabilities = {};
     resources.forEach((resource, index) => {
@@ -44,7 +37,7 @@ export async function loadResourcesWithBookingsAndAvailability(userId) {
   }
 }
 
-export async function confirmBooking(bookingId) {
+async function confirmBooking(bookingId) {
   const res = await apiFetch(`/api/bookings/${bookingId}/confirm`, { method: "PATCH" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -56,7 +49,7 @@ export async function confirmBooking(bookingId) {
   return true;
 }
 
-export async function declineBooking(bookingId) {
+async function declineBooking(bookingId) {
   if (!confirm("Decline this booking request?")) return false;
   const res = await apiFetch(`/api/bookings/${bookingId}`, { method: "DELETE" });
   if (!res.ok) {
@@ -69,7 +62,7 @@ export async function declineBooking(bookingId) {
   return true;
 }
 
-export async function deleteResource(id) {
+async function deleteResource(id) {
   if (!confirm("Delete this resource? This cannot be undone.")) return { ok: false };
   const res = await apiFetch(`/api/resources/${id}`, { method: "DELETE" });
   const json = await res.json().catch(() => ({}));
@@ -79,29 +72,37 @@ export async function deleteResource(id) {
   return { ok: true };
 }
 
-export async function deleteAvailability(resourceId, availabilityId) {
-  if (!confirm("Delete this availability?")) return false;
-  const response = await handleDeleteAvailability(resourceId, availabilityId);
-  if (response && response.ok) {
-    notifier?.success?.("Availability deleted");
-    return true;
+async function deleteAvailability(resourceId, availabilityId) {
+  if (!resourceId || !availabilityId) {
+    notifier.error("Invalid resource or availability ID");
+    return false;
   }
-  return false;
-}
 
-async function handleDeleteAvailability(resourceId, availabilityId) {
-  if (!resourceId || !availabilityId) return { ok: false };
+  if (!confirm("Delete this availability?")) return false;
+
   const response = await apiFetch(`/api/resources/${resourceId}/availabilities/${availabilityId}`, {
     method: "DELETE",
   });
+
   let data = {};
-  const content = response.headers.get("content-type") || "";
+  const content = response.headers.get("content-type");
   if (content.includes("application/json")) data = await response.json();
   else data = { message: await response.text() };
+
   if (!response.ok) {
-    toast(data.message || "Failed to delete availability", "error");
-    return { ok: false, data };
+    notifier.error(data.message || "Failed to delete availability");
+    return false;
   }
-  toast(data.message || "Availability deleted", "success");
-  return { ok: true, data };
+
+  notifier.success(data.message || "Availability deleted");
+  return true;
 }
+
+export default {
+  fetchBookingsFor,
+  loadResourcesWithBookingsAndAvailability,
+  confirmBooking,
+  declineBooking,
+  deleteResource,
+  deleteAvailability,
+};

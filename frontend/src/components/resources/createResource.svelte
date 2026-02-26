@@ -1,12 +1,13 @@
 <script>
   import { onMount } from "svelte";
-  import { fetchTypes, fetchAllResources } from "../../fetchers/bookingFetchers.js";
-  import apiFetch from "../../lib/api.js";
+  import bookingFetchers from "../../fetchers/bookingFetchers.js";
+  import { apiFetch } from "../../lib/api.js";
+  import notifier from "../../lib/notifier.js";
   import CarFields from "./carFields.svelte";
   import ImageUploader from "./imageUploader.svelte";
-  import { handleCreate } from "../../handlers/bookingHandlers.js";
+  import bookingHandlers from "../../handlers/bookingHandlers.js";
   import logger from "../../lib/logger.js";
-  import { getCachedUser } from "../../utils/authUtils.js";
+  import authUtils from "../../utils/authUtils.js";
 
   let types = [];
   let create = { name: "", type: "" };
@@ -27,15 +28,15 @@
 
   onMount(async () => {
     try {
-      types = await fetchTypes();
+      types = await bookingFetchers.fetchTypes();
       try {
-        const all = await fetchAllResources();
+        const all = await bookingFetchers.fetchAllResources();
         resourcesAll = all.resourcesAll || [];
       } catch (error) {
         logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
       }
       try {
-        const cached = getCachedUser();
+        const cached = authUtils.getCachedUser();
         const userId = cached?.id;
         if (userId) {
           const r = await apiFetch(`/api/users/${userId}/resources`);
@@ -61,14 +62,14 @@
       const finalBrand = createBrand === "Other" ? createBrandOther || "Other" : createBrand;
       let finalModel = "";
       if (createBrand === "Other") {
-        finalModel = createModel || createModelCustom || "";
+        finalModel = createModel || createModelCustom;
       } else if (createBrand) {
-        finalModel = createModelSelect === "Other" ? createModelCustom || "" : createModelSelect || "";
+        finalModel = createModelSelect === "Other" ? createModelCustom : createModelSelect;
       } else {
-        finalModel = createModel || "";
+        finalModel = createModel;
       }
 
-      const res = await handleCreate({ create, isCarCreate, createBrand: finalBrand, createModel: finalModel, createYear }, createImageFiles);
+      const res = await bookingHandlers.handleCreate({ create, isCarCreate, createBrand: finalBrand, createModel: finalModel, createYear }, createImageFiles);
 
       if (res && res.ok) {
         create = { name: "", type: "" };
@@ -80,13 +81,13 @@
           logger.error("Failed to reset file input", error && error.message ? error.message : error);
         }
         try {
-          const all = await fetchAllResources();
+          const all = await bookingFetchers.fetchAllResources();
           resourcesAll = all.resourcesAll || [];
         } catch (error) {
           logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
         }
         try {
-          const cached = getCachedUser();
+          const cached = authUtils.getCachedUser();
           const userId = cached?.id;
           if (userId) {
             const resources = await apiFetch(`/api/users/${userId}/resources`);

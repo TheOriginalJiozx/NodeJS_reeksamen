@@ -1,6 +1,8 @@
 import logger from "../lib/logger.js";
-import { groupContinuousDates } from "../utils/bookingUtils.js";
-export let baseURL = "/api";
+import { apiFetch } from "../lib/api.js";
+import bookingUtils from "../utils/bookingUtils.js";
+
+const API = "/api";
 
 function computeDatesFromAvailabilities(availableDates) {
   const set = new Set();
@@ -18,14 +20,14 @@ function computeDatesFromAvailabilities(availableDates) {
   return Array.from(set).sort();
 }
 
-export async function fetchAllResources() {
-  const res = await fetch(`${baseURL}/resources`, { credentials: "include" });
+async function fetchAllResources() {
+  const res = await apiFetch(`${API}/resources`, { credentials: "include" });
   const resourcesAll = res.ok ? await res.json() : [];
   const availableResourceIds = new Set();
 
   for (const resource of resourcesAll) {
     try {
-      const res = await fetch(`${baseURL}/resources/${resource.id}/availabilities`, {
+      const res = await apiFetch(`${API}/resources/${resource.id}/availabilities`, {
         credentials: "include",
       });
       if (!res.ok) continue;
@@ -54,17 +56,17 @@ export async function fetchAllResources() {
   };
 }
 
-export async function fetchTypes() {
-  const res = await fetch(`${baseURL}/types`, {
+async function fetchTypes() {
+  const res = await apiFetch(`${API}/types`, {
     credentials: "include",
   });
   const types = res.ok ? await res.json() : [];
   return types;
 }
 
-export async function fetchAvailability(id) {
+async function fetchAvailability(id) {
   if (!id) return { availability: [], availableDates: [], availableRanges: [] };
-  const res = await fetch(`${baseURL}/resources/${id}/availabilities`, {
+  const res = await apiFetch(`${API}/resources/${id}/availabilities`, {
     credentials: "include",
   });
   const raw = res.ok ? await res.json() : null;
@@ -103,13 +105,13 @@ export async function fetchAvailability(id) {
     availableDates = computeDatesFromAvailabilities(availability);
   }
 
-  const availableRanges = groupContinuousDates(availableDates);
+    const availableRanges = bookingUtils.groupContinuousDates(availableDates);
   return { availability, availableDates, availableRanges };
 }
 
-export async function fetchUserBookings() {
+async function fetchUserBookings() {
   try {
-    const response = await apiFetch(`${baseURL}/bookings`, { credentials: "include" });
+    const response = await apiFetch(`${API}/bookings`, { credentials: "include" });
     if (!response.ok) {
       logger.warn("Failed to fetch user bookings", { status: response.status });
       return [];
@@ -121,3 +123,10 @@ export async function fetchUserBookings() {
     return [];
   }
 }
+
+export default {
+  fetchAllResources,
+  fetchTypes,
+  fetchAvailability,
+  fetchUserBookings,
+};

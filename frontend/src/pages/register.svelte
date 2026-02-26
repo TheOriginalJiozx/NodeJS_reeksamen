@@ -1,11 +1,11 @@
 <script>
-  import notifier from "../lib/notifier.js";
   import { onMount } from "svelte";
-  import user from "../store/usersStore.js";
+  import notifier from "../lib/notifier.js";
+  import { authUser } from "../store/usersStore.js";
   import { navigate, route } from "../lib/router.js";
   import logger from "../lib/logger.js";
-  import apiFetch from "../lib/api.js";
-  import { parseResponse, getErrorMessage, getSuccessMessage } from "../utils/responseUtils.js";
+  import { apiFetch } from "../lib/api.js";
+  import responseUtils from "../utils/responseUtils.js";
 
   let name = "";
   let fullName = "";
@@ -14,7 +14,7 @@
   let confirm = "";
 
   onMount(() => {
-    if ($user) {
+    if ($authUser) {
       navigate("/profile");
       route.set("/profile");
     }
@@ -30,15 +30,15 @@
         body: JSON.stringify({ username: name, fullname: fullName, email, password, confirmPassword: confirm }),
       });
 
-      const data = await parseResponse(res);
+      const data = await responseUtils.parseResponse(res);
 
       if (!res.ok) {
-        const errMsg = getErrorMessage(data, "Registration failed");
+        const errMsg = responseUtils.getErrorMessage(data, "Registration failed");
         notifier.error(errMsg);
         return;
       }
 
-      const successMsg = getSuccessMessage(data, "Account created");
+        const successMsg = responseUtils.getSuccessMessage(data, "Account created");
       notifier.success(successMsg);
       name = "";
       fullName = "";

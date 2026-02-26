@@ -1,15 +1,15 @@
-import { toast } from "../store/toastStore.js";
+import toastStore from "../store/toastStore.js";
 
-export function success(message, timeout) {
-  toast(message, "success", timeout);
+function success(message, timeout) {
+  toastStore.toast(message, "success", timeout);
 }
 
-export function error(message, timeout) {
-  toast(message, "error", timeout);
+function error(message, timeout) {
+  toastStore.toast(message, "error", timeout);
 }
 
-export function info(message, timeout) {
-  toast(message, "info", timeout);
+function info(message, timeout) {
+  toastStore.toast(message, "info", timeout);
 }
 
 export default {

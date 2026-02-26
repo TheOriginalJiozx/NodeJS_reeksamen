@@ -1,7 +1,7 @@
 <script>
   export let bookings = [];
-  export let confirm = (_id) => {};
-  export let decline = (_id) => {};
+  export let confirm = () => {};
+  export let decline = () => {};
 </script>
 
 {#if Array.isArray(bookings) && bookings.length > 0}

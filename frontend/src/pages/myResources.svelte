@@ -1,13 +1,13 @@
 <script>
   import { onMount, onDestroy } from "svelte";
-  import { navigate } from "../lib/router.js";
-  import apiFetch from "../lib/api.js";
+  import { navigate, route } from "../lib/router.js";
+  import { apiFetch } from "../lib/api.js";
   import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
   import ResourceTable from "../components/resources/resourceTable.svelte";
-  import { initializeSocket, disconnectSocket } from "../utils/socketUtils.js";
-  import { loadAuthenticatedUser } from "../utils/authUtils.js";
-  import { confirmBooking, declineBooking, deleteResource, deleteAvailability, loadResourcesWithBookingsAndAvailability } from "../handlers/resourceHandlers.js";
+  import socketUtils from "../utils/socketUtils.js";
+  import authUtils from "../utils/authUtils.js";
+  import resourceHandlers from "../handlers/resourceHandlers.js";
 
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
@@ -36,26 +36,32 @@
   }
 
   async function fetchResources() {
-    const { resources: res, resourceBookings: newBookings, resourceAvailabilities: newAvailabilities } = await loadResourcesWithBookingsAndAvailability(user?.id);
+    const { resources: res, resourceBookings: newBookings, resourceAvailabilities: newAvailabilities } = await resourceHandlers.loadResourcesWithBookingsAndAvailability(user?.id);
     resources = res;
     resourceBookings = newBookings;
     resourceAvailabilities = newAvailabilities;
+    
+    if (socket) {
+      resources.forEach((resource) => {
+        socketUtils.joinResourceRoom(socket, resource.id);
+      });
+    }
   }
 
   async function handleConfirmBooking(bookingId) {
-    if (await confirmBooking(bookingId)) {
+    if (await resourceHandlers.confirmBooking(bookingId)) {
       await fetchResources();
     }
   }
 
   async function handleDeclineBooking(bookingId) {
-    if (await declineBooking(bookingId)) {
+    if (await resourceHandlers.declineBooking(bookingId)) {
       await fetchResources();
     }
   }
 
   async function handleDeleteResource(id) {
-    const res = await deleteResource(id);
+      const res = await resourceHandlers.deleteResource(id);
     if (res.ok) {
       resources = resources.filter((resource) => String(resource.id) !== String(id));
       notifier.success("Resource deleted");
@@ -70,19 +76,19 @@
   });
 
   onDestroy(() => {
-    disconnectSocket(socket);
+    socketUtils.disconnectSocket(socket);
   });
 
   onMount(async () => {
     try {
-      const parsed = loadAuthenticatedUser();
+      const parsed = authUtils.loadAuthenticatedUser();
       if (!parsed?.id) return navigate("/login");
-      const me = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
-      if (me.status === 401) return navigate("/login");
-      user = (await me.json()).user || null;
+      const userResponse = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
+      if (userResponse.status === 401) return navigate("/login");
+      user = (await userResponse.json()).user || null;
       await fetchResources();
 
-      socket = initializeSocket(BACKEND_ORIGIN, user?.username, fetchResources);
+      socket = socketUtils.initializeSocket(BACKEND_ORIGIN, user?.fullname, fetchResources);
     } catch (error) {
       notifier.error("Failed to load resources");
       logger.error("Failed to fetch user or resources", error && error.message ? error.message : error);
@@ -114,7 +120,7 @@
             onDeleteResource={handleDeleteResource}
             onConfirmBooking={handleConfirmBooking}
             onDeclineBooking={handleDeclineBooking}
-            onDeleteAvailability={deleteAvailability}
+            onDeleteAvailability={resourceHandlers.deleteAvailability}
           />
         {/if}
       </section>

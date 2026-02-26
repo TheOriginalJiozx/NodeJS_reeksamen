@@ -22,10 +22,10 @@ router.get(`${API}/users/export`, isLoggedIn, async (req, res) => {
     const result = await db.query(userQueries.selectUserById, [userId]);
     const userData = result.rows[0] || null;
     const exportData = { user: userData, resources: [], bookings: [], availabilities: [] };
-    if (userData?.username) {
-      exportData.resources = (await db.query(resourceQueries.getOwnedResources, [userData.username])).rows || [];
+    if (userData?.username && userData?.fullname) {
+      exportData.resources = (await db.query(resourceQueries.getOwnedResources, [userData.fullname])).rows || [];
       exportData.bookings = (await db.query(bookingQueries.getBookingsForUserOrOwner, [userData.username])).rows || [];
-      exportData.availabilities = (await db.query(availabilityQueries.getAvailabilitiesForOwnerResources, [userData.username])).rows || [];
+      exportData.availabilities = (await db.query(availabilityQueries.getAvailabilitiesForOwnerResources, [userData.fullname])).rows || [];
     }
     const payload = JSON.stringify(exportData, null, 2);
     res.setHeader("Content-Disposition", 'attachment; filename="user-data.json"');

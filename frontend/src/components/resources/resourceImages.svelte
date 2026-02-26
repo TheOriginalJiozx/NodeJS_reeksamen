@@ -4,7 +4,7 @@
   export let open = () => {};
 
   function getImages(imageString) {
-    return String(imageString || "").split(";").filter(Boolean);
+    return String(imageString).split(";").filter(Boolean);
   }
 </script>
 

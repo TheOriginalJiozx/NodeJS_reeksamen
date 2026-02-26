@@ -2,13 +2,13 @@
   import { onMount, onDestroy } from "svelte";
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
-  import { fetchAvailability } from "../../fetchers/bookingFetchers.js";
-  import apiFetch from "../../lib/api.js";
-  import { handleAddAvailability } from "../../handlers/bookingHandlers.js";
+  import bookingFetchers from "../../fetchers/bookingFetchers.js";
+  import { apiFetch } from "../../lib/api.js";
+  import bookingHandlers from "../../handlers/bookingHandlers.js";
   import notifier from "../../lib/notifier.js";
-  import { today, contiguousEndDates } from "../../utils/bookingUtils.js";
+  import bookingUtils from "../../utils/bookingUtils.js";
   import logger from "../../lib/logger.js";
-  import { getCachedUser } from "../../utils/authUtils.js";
+  import authUtils from "../../utils/authUtils.js";
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
   let resourcesOwned = [];
   let available = { resourceId: "", startDate: "", endDate: "" };
@@ -27,7 +27,7 @@
       availableDates = [];
       return;
     }
-    const fetch = await fetchAvailability(id);
+    const fetch = await bookingFetchers.fetchAvailability(id);
     availability = fetch.availability || [];
     availableDates = fetch.availableDates || [];
   }
@@ -48,16 +48,16 @@
 
   $: ownerAvailable = computeOwnerAvailable();
   $: availableEndOptions = available.startDate
-    ? contiguousEndDates(available.startDate, ownerAvailable)
+    ? bookingUtils.contiguousEndDates(available.startDate, ownerAvailable)
     : ownerAvailable;
 
   $: if (startFlatPickr) {
     startFlatPickr.set("enable", ownerAvailable);
-    startFlatPickr.set("minDate", today);
+    startFlatPickr.set("minDate", bookingUtils.today);
   }
   $: if (endFlatPickr) {
     endFlatPickr.set("enable", availableEndOptions);
-    endFlatPickr.set("minDate", available.startDate || today);
+    endFlatPickr.set("minDate", available.startDate || bookingUtils.today);
     if (available.endDate && !availableEndOptions.includes(available.endDate)) {
       available.endDate = "";
       try {
@@ -72,7 +72,7 @@
 
   onMount(async () => {
     try {
-      const cached = getCachedUser();
+      const cached = authUtils.getCachedUser();
       const userId = cached?.id;
       if (userId) {
         const res = await apiFetch(`/api/users/${userId}/resources`);
@@ -89,15 +89,15 @@
     startFlatPickr = flatpickr(startElement, {
       dateFormat: "Y-m-d",
       enable: ownerAvailable,
-      minDate: today,
-      onChange: (_selectedDates, dateString) => (available.startDate = dateString || ""),
+      minDate: bookingUtils.today,
+      onChange: (_selectedDates, dateString) => (available.startDate = dateString),
     });
 
     endFlatPickr = flatpickr(endElement, {
       dateFormat: "Y-m-d",
       enable: availableEndOptions,
-      minDate: available.startDate || today,
-      onChange: (_selectedDates, dateString) => (available.endDate = dateString || ""),
+      minDate: available.startDate || bookingUtils.today,
+      onChange: (_selectedDates, dateString) => (available.endDate = dateString),
     });
 
     try {
@@ -105,7 +105,7 @@
         socket = globalThis.io(BACKEND_ORIGIN, { withCredentials: true });
         socket.on("resource:created", async () => {
           try {
-            const cached = getCachedUser();
+            const cached = authUtils.getCachedUser();
             const userId = cached?.id;
             if (userId) {
               const res = await apiFetch(`/api/users/${userId}/resources`);
@@ -119,7 +119,7 @@
         });
         socket.on("resource:deleted", async () => {
           try {
-            const cached = getCachedUser();
+            const cached = authUtils.getCachedUser();
             const userId = cached?.id;
             if (userId) {
               const res = await apiFetch(`/api/users/${userId}/resources`);
@@ -170,7 +170,7 @@
       return;
     }
 
-    const res = await handleAddAvailability(available);
+    const res = await bookingHandlers.handleAddAvailability(available);
     if (res && res.ok) {
       const id = available.resourceId;
       try {

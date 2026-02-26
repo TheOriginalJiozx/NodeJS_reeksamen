@@ -1,12 +1,13 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { navigate } from "../lib/router.js";
   import logger from "../lib/logger.js";
-  import apiFetch from "../lib/api.js";
-  import notifier from "../lib/notifier.js";
-  import { loadAuthenticatedUser } from "../utils/authUtils.js";
+  import authUtils from "../utils/authUtils.js";
   import ImagePreview from "../components/resources/imagePreview.svelte";
-  import BookingRow from "../components/bookings/bookingRow.svelte";
+  import BookingsTable from "../components/bookings/bookingsTable.svelte";
+  import { notifications, removeNotificationsByBookingId } from "../store/notificationsStore.js";
+  import { fetchUserBookings, fetchAllBookings, fetchAllResources } from "../services/bookingService.js";
+  import { setupBookingSocket, disconnectSocket } from "../services/bookingSocket.js";
 
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
@@ -15,7 +16,6 @@
   let bookings = [];
   let resources = [];
   let resourceMap = {};
-  let error = null;
   let socket = null;
   let previewData = null;
 
@@ -27,95 +27,54 @@
     previewData = { imagesString: images, label: label || "Image preview", startIndex };
   }
 
-  async function fetchBookings() {
-    try {
-      const res = await apiFetch("/api/bookings", { credentials: "include" });
-      if (!res.ok) {
-        notifier.error("Failed to load bookings");
-        return;
-      }
-      const data = await res.json();
-      bookings = Array.isArray(data.bookings) ? data.bookings : data.bookings || [];
-      if (user && user.username) bookings = bookings.filter((bookings) => String(bookings.booker) === String(user.username));
-      bookings.sort((left, right) => new Date(left.startDate) - new Date(right.startDate));
-    } catch (error) {
-      notifier.error("Failed to load bookings");
-      logger.error("Error fetching bookings", error && error.message ? error.message : error);
+  async function loadData() {
+    const parsed = authUtils.loadAuthenticatedUser();
+    if (!parsed || !parsed.id) {
+      navigate("/login");
+      return;
     }
+
+    const userData = await fetchUserBookings(parsed.id);
+    if (!userData) {
+      navigate("/login");
+      return;
+    }
+
+    user = userData.user || null;
+    bookings = await fetchAllBookings(user?.fullname);
+    const { resources: res, resourceMap: map } = await fetchAllResources();
+    resources = res;
+    resourceMap = map;
+  }
+
+  async function cleanupNotifications() {
+    let notificationsList = [];
+    const unsubscribe = notifications.subscribe((list) => {
+      notificationsList = list;
+    });
+
+    notificationsList.forEach((notification) => {
+      if ((notification.type === "booking:confirmed" || notification.type === "booking:declined") && notification.bookingId) {
+        removeNotificationsByBookingId(notification.bookingId);
+      }
+    });
+    unsubscribe();
   }
 
   onMount(async () => {
     try {
-      const parsed = loadAuthenticatedUser();
-      if (!parsed || !parsed.id) {
-        navigate("/login");
-        return;
-      }
-      const me = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
-      if (me.status === 401) {
-        navigate("/login");
-        return;
-      }
-      const meData = await me.json();
-      user = meData.user || null;
-      // spørgsmål: hvorfor bruger vi Promise.all her?
-      // Vi bruger Promise.all her for at køre flere asynkrone operationer parallelt og vente på, at de alle er færdige.
-      // I dette tilfælde vil vi gerne hente både bookinger og ressourcer samtidig,
-      // og ved at bruge Promise.all kan vi starte begge forespørgsler på samme tid,
-      // hvilket kan være hurtigere end at vente på den første, før vi starter den anden.
-      await Promise.all([
-        fetchBookings(),
-        (async () => {
-          try {
-            const res = await apiFetch("/api/resources", { credentials: "include" });
-            if (!res.ok) {
-              notifier.error("Failed to load resources");
-              return;
-            }
-            resources = await res.json();
-            resourceMap = {};
-            for (const resource of resources) resourceMap[String(resource.id)] = resource;
-          } catch (error) {
-            notifier.error("Failed to load resources");
-            logger.error("Failed to fetch resources", error && error.message ? error.message : error);
-          }
-        })(),
-      ]);
-
-      try {
-        if (typeof globalThis.io === "function") {
-          socket = globalThis.io(BACKEND_ORIGIN, { withCredentials: true });
-          socket.on("booking:created", () => fetchBookings());
-          socket.on("booking:deleted", () => {
-            notifier.info("A booking was removed");
-            fetchBookings();
-          });
-          socket.on("booking:confirmed", () => {
-            try {
-              notifier.success("Your booking was confirmed");
-            } catch (error) {
-              logger.error("Failed to show booking confirmed notification", error && error.message ? error.message : error);
-            }
-            fetchBookings();
-          });
-          socket.on("booking:declined", () => {
-            try {
-              notifier.error("Your booking was declined");
-            } catch (error) {
-              logger.error("Failed to show booking declined notification", error && error.message ? error.message : error);
-            }
-            fetchBookings();
-          });
-          socket.on("availability:changed", () => fetchBookings());
-        }
-      } catch (error) {
-        logger.warn("socket setup in myBookings failed", error && error.message ? error.message : error);
-      }
+      await cleanupNotifications();
+      await loadData();
+      socket = setupBookingSocket(BACKEND_ORIGIN, user, loadData);
     } catch (error) {
-      logger.error("Error fetching bookings or resources", error && error.message ? error.message : error);
+      logger.error("Error in myBookings", error && error.message ? error.message : error);
     } finally {
       loading = false;
     }
+  });
+
+  onDestroy(() => {
+    disconnectSocket(socket);
   });
 </script>
 
@@ -127,27 +86,12 @@
 
         {#if loading}
           <div class="text-gray-600">Loading...</div>
-        {:else if error}
-          <div class="text-red-600">{error}</div>
-        {:else if bookings.length === 0}
-          <div class="text-gray-600">You have no bookings.</div>
         {:else}
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="text-sm text-gray-600 border-b">
-                <th class="py-2">Resource</th>
-                <th class="py-2">Dates</th>
-                <th class="py-2">Status</th>
-                <th class="py-2">Comment</th>
-                <th class="py-2">Image(s)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each bookings as booking}
-                <BookingRow {booking} {resourceMap} on:openPreview={(event) => openPreview(event.detail.imagesString, event.detail.label, event.detail.startIndex)} />
-              {/each}
-            </tbody>
-          </table>
+          <BookingsTable
+            {bookings}
+            {resourceMap}
+            on:openPreview={(event) => openPreview(event.detail.imagesString, event.detail.label, event.detail.startIndex)}
+          />
         {/if}
       </section>
     </div>

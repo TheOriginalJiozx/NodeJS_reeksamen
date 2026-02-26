@@ -4,12 +4,13 @@ export const getAllBookings = `SELECT id, booker, resource_id, DATE_FORMAT(start
 export const checkAvailabilityExists = `SELECT 1 FROM availabilities WHERE resource_id = ? AND start_date <= ? AND end_date >= ?`;
 export const checkBookingConflict = `SELECT 1 FROM bookings WHERE resource_id = ? AND NOT (end_date < ? OR start_date > ?)`;
 export const checkConfirmedBookingConflict = `SELECT 1 FROM bookings WHERE resource_id = ? AND confirmed = 1 AND NOT (end_date < ? OR start_date > ?)`;
+export const checkAnyNonDeclinedBookingConflict = `SELECT 1 FROM bookings WHERE resource_id = ? AND (confirmed IS NULL OR confirmed = 0 OR confirmed = 1) AND NOT (end_date < ? OR start_date > ?)`;
 
 export const insertBooking = `INSERT INTO bookings (booker, resource_id, start_date, end_date, comment) VALUES (?, ?, ?, ?, ?)`;
 export const selectImageForResource = `SELECT image FROM resources WHERE id = ?`;
 export const updateBookingImage = `UPDATE bookings SET image = ? WHERE id = ?`;
 export const deleteBookingById = `DELETE FROM bookings WHERE id = ?`;
-export const selectBookingById = `SELECT id, booker, resource_id FROM bookings WHERE id = ?`;
+export const selectBookingById = `SELECT id, booker, resource_id, DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate, DATE_FORMAT(end_date, '%Y-%m-%d') AS endDate FROM bookings WHERE id = ?`;
 
 export const confirmBookingById = `UPDATE bookings SET confirmed = 1 WHERE id = ?`;
 export const declineBookingById = `UPDATE bookings SET confirmed = 2 WHERE id = ?`;

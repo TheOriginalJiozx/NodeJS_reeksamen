@@ -4,7 +4,7 @@ import * as userQueries from "../../db/queries/users.js";
 import { isLoggedIn } from "../../middleware/authMiddleware.js";
 import { allowSelfOrAdmin } from "../../auth/authorization.js";
 import logger from "../../lib/logger.js";
-import auth from "../../utils/authorizerUtils.js";
+import { encryptPassword, validatePassword } from "../../utils/authorizerUtils.js";
 import { collectSessionIdsForUsername, destroySessionIds } from "../../utils/sessionUtils.js";
 
 const router = Router();
@@ -47,7 +47,6 @@ router.patch(`${API}/users/:id/username`, isLoggedIn, allowSelfOrAdmin(), async 
       await db.query("START TRANSACTION");
       await db.query(userQueries.updateUsername, [newUsername, idParameter]);
       await db.query(userQueries.updateBookingsBooker, [newUsername, oldUsername]);
-      await db.query(userQueries.updateResourcesOwner, [newUsername, oldUsername]);
       await db.query("COMMIT");
     } catch (transactionError) {
       try {
@@ -138,11 +137,11 @@ router.patch(`${API}/users/:id/password`, isLoggedIn, allowSelfOrAdmin(), async 
     const loginRow = await db.query(userQueries.selectUserForLogin, [existing.username]);
     const stored = loginRow.rows?.[0]?.passwordHash || null;
     
-    if (!auth.validatePassword(currentPassword, stored)) {
+    if (!validatePassword(currentPassword, stored)) {
       return res.status(403).json({ message: "Current password incorrect" });
     }
 
-    const hashed = auth.encryptPassword(newPassword);
+    const hashed = encryptPassword(newPassword);
     await db.query(userQueries.updatePasswordHash, [hashed, idParameter]);
 
     return res.status(200).json({ message: "Password updated" });

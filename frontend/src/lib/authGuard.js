@@ -1,11 +1,12 @@
-import { route, navigate } from "./router.js";
-import user, { ready } from "../store/usersStore.js";
+import { navigate, route } from "./router.js";
+import { authUser, ready } from "../store/usersStore.js";
 import logger from "./logger.js";
 import { protectedRoutes } from "./authorization.js";
 
 let currentUser = null;
-user.subscribe((user) => (currentUser = user));
 let guardActive = false;
+
+authUser.subscribe((user) => (currentUser = user));
 
 function initializeRouteGuard() {
   if (guardActive) return;

@@ -18,7 +18,7 @@ import resourcesRouter from "./routers/resources/resourcesRouter.js";
 import typesRouter from "./routers/types/typesRouter.js";
 import uploadsRouter from "./routers/uploads/uploadsRouter.js";
 import carBrandsRouter from "./routers/carBrands/carBrandsRouter.js";
-import initializeSocket from "./utils/socketUtils.js";
+import { initializeSocket } from "./utils/socketUtils.js";
 import csrfMiddleware from "./middleware/csrfMiddleware.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;

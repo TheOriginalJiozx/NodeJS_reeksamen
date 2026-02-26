@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
     callback(null, uploadDirectory);
   },
   filename: function (_req, file, callback) {
-    const extension = path.extname(file.originalname) || "";
+    const extension = path.extname(file.originalname);
     const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extension}`;
     callback(null, name);
   },
@@ -44,10 +44,6 @@ const upload = multer({
 });
 
 async function scanFileForViruses(filePath) {
-  // spørgsmål: hvorfor bruger vi Promise her?
-  // Vi bruger en Promise her for at gøre den callback-baserede spawn-metode kompatibel med async/await-syntaksen.
-  // spawn forventer, at vi håndterer output og afslutning gennem callbacks, men ved at indpakke det i en Promise kan vi bruge await for at vente på resultatet,
-  // hvilket gør koden mere læsbar og lettere at håndtere i tilfælde af fejl.
   return new Promise((resolve) => {
     try {
       const clamscan = spawn("clamscan", ["--quiet", filePath]);
@@ -113,7 +109,7 @@ router.post(`${API}/uploads`, isLoggedIn, (req, res) => {
       }
 
       const filename = req.file.filename;
-      const frontendOrigin = process.env.FRONTEND_ORIGIN || "";
+      const frontendOrigin = process.env.FRONTEND_ORIGIN;
       const url = `${frontendOrigin.replace(/\/$/, "")}${API}/uploads/${filename}`;
       return res.status(201).json({ url, filename });
     } catch (error) {

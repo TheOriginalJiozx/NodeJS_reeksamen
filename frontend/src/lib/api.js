@@ -2,7 +2,7 @@ import logger from "./logger";
 
 let cachedCsrf = null;
 
-export default async function apiFetch(input, options = {}) {
+async function apiFetch(input, options = {}) {
   try {
     const requestOptions = Object.assign({ credentials: "include" }, options || {});
     const method = (requestOptions.method || "GET").toUpperCase();
@@ -52,6 +52,8 @@ async function fetchCsrf() {
   }
 }
 
-export function clearCsrfCache() {
+function clearCsrfCache() {
   cachedCsrf = null;
 }
+
+export { apiFetch, clearCsrfCache };

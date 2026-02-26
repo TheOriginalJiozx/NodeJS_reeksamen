@@ -1,6 +1,6 @@
 import logger from "../lib/logger.js";
 
-export function getCachedUser() {
+function getCachedUser() {
   try {
     const cached = localStorage.getItem("user");
     if (!cached) return null;
@@ -12,11 +12,11 @@ export function getCachedUser() {
   }
 }
 
-export function isValidUser(user) {
+function isValidUser(user) {
   return user && user.id ? true : false;
 }
 
-export function loadAuthenticatedUser() {
+function loadAuthenticatedUser() {
   const user = getCachedUser();
   if (!isValidUser(user)) {
     localStorage.removeItem("user");
@@ -25,10 +25,17 @@ export function loadAuthenticatedUser() {
   return user;
 }
 
-export function clearUserCache() {
+function clearUserCache() {
   try {
     localStorage.removeItem("user");
   } catch (error) {
     logger.debug("Failed to clear user cache", error && error.message ? error.message : error);
   }
 }
+
+export default {
+  getCachedUser,
+  isValidUser,
+  loadAuthenticatedUser,
+  clearUserCache,
+};

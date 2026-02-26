@@ -1,8 +1,8 @@
 import logger from "../lib/logger.js";
 
-export async function parseResponse(res) {
+async function parseResponse(res) {
   try {
-    const contentType = res.headers.get("content-type") || "";
+    const contentType = res.headers.get("content-type");
     if (contentType.includes("application/json")) {
       return await res.json();
     } else {
@@ -15,10 +15,16 @@ export async function parseResponse(res) {
   }
 }
 
-export function getErrorMessage(data, defaultMessage = "Operation failed") {
+function getErrorMessage(data, defaultMessage = "Operation failed") {
   return (data && data.message) ? data.message : defaultMessage;
 }
 
-export function getSuccessMessage(data, defaultMessage = "Operation successful") {
+function getSuccessMessage(data, defaultMessage = "Operation successful") {
   return (data && data.message) ? data.message : defaultMessage;
 }
+
+export default {
+  parseResponse,
+  getErrorMessage,
+  getSuccessMessage,
+};

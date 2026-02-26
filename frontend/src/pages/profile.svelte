@@ -3,12 +3,12 @@
   import { navigate } from "../lib/router.js";
   import notifier from "../lib/notifier.js";
   import { clearAuth } from "../lib/authentication.js";
-  import authUser from "../store/usersStore.js";
+  import { authUser } from "../store/usersStore.js";
   import { isAdmin } from "../lib/authorization.js";
   import logger from "../lib/logger.js";
-  import apiFetch from "../lib/api.js";
-  import { loadAuthenticatedUser, clearUserCache } from "../utils/authUtils.js";
-  import { parseResponse, getErrorMessage, getSuccessMessage } from "../utils/responseUtils.js";
+  import { apiFetch } from "../lib/api.js";
+  import authUtils from "../utils/authUtils.js";
+  import responseUtils from "../utils/responseUtils.js";
 
   let user = null;
   let loading = true;
@@ -27,19 +27,19 @@
       }
 
       const res = await apiFetch(`/api/users/${targetId}`, { method: "DELETE" });
-      const data = await parseResponse(res);
+      const data = await responseUtils.parseResponse(res);
 
       if (res.ok) {
-        clearUserCache();
+        authUtils.clearUserCache();
         try {
           clearAuth();
         } catch (error) {}
-        notifier.success(getSuccessMessage(data, "Account deleted"));
+        notifier.success(responseUtils.getSuccessMessage(data, "Account deleted"));
         navigate("/");
         return;
       }
 
-      const errorMessage = getErrorMessage(data, "Failed to delete account");
+      const errorMessage = responseUtils.getErrorMessage(data, "Failed to delete account");
       notifier.error(errorMessage);
     } catch (error) {
       notifier.error("Failed to delete account");
@@ -55,13 +55,13 @@
     try {
       const res = await apiFetch("/api/users/export", { method: "GET" });
       if (!res.ok) {
-        const error = await parseResponse(res);
-        notifier.error(getErrorMessage(error, "Export failed"));
+        const error = await responseUtils.parseResponse(res);
+        notifier.error(responseUtils.getErrorMessage(error, "Export failed"));
         return;
       }
 
       const blob = await res.blob();
-      const disposition = res.headers.get("content-disposition") || "";
+      const disposition = res.headers.get("content-disposition");
       const username = user?.username || "user";
       let filename = `${username}-data.json`;
       const match = /filename=\"?([^\";]+)\"?/.exec(disposition);
@@ -86,7 +86,7 @@
 
   onMount(async () => {
     try {
-      const parsed = loadAuthenticatedUser();
+      const parsed = authUtils.loadAuthenticatedUser();
       if (!parsed) {
         navigate("/login");
         return;
@@ -105,7 +105,7 @@
         return;
       }
 
-      const data = await parseResponse(res);
+      const data = await responseUtils.parseResponse(res);
       user = data.user || null;
     } catch (error) {
       notifier.error("Failed to load profile");

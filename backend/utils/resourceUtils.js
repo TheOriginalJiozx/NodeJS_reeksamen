@@ -2,12 +2,12 @@ import logger from "../lib/logger.js";
 import fs from "fs";
 import path from "path";
 
-export const sendServerError = (res, tag, error) => {
+const sendServerError = (res, tag, error) => {
   logger.error(error, tag);
   return res.status(500).json({ message: "Internal server error" });
 };
 
-export const deleteUploadFile = (image) => {
+const deleteUploadFile = (image) => {
   if (!image || !String(image).includes("/uploads/")) return;
   try {
     const filename = String(image).split("/uploads/").pop();
@@ -18,7 +18,7 @@ export const deleteUploadFile = (image) => {
   }
 };
 
-export const datesBetween = (startString, endString) => {
+const datesBetween = (startString, endString) => {
   const output = [];
   const [startYear, startMonth, startDay] = String(startString).split("-").map(Number);
   const [endYear, endMonth, endDay] = String(endString).split("-").map(Number);
@@ -32,3 +32,5 @@ export const datesBetween = (startString, endString) => {
   }
   return output;
 };
+
+export { sendServerError, deleteUploadFile, datesBetween };

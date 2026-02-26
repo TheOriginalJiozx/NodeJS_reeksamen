@@ -1,5 +1,5 @@
 import { Router } from "express";
-import auth from "../../utils/authorizerUtils.js";
+import { encryptPassword, validatePassword } from "../../utils/authorizerUtils.js";
 import db from "../../db/connection.js";
 import * as userQueries from "../../db/queries/users.js";
 import { rateLimit } from "express-rate-limit";
@@ -18,8 +18,8 @@ const authLimiter = rateLimit({
 });
 
 router.post(`${API}/auth/login`, authLimiter, async (req, res) => {
-  const username = (req.body.username || "").trim();
-  const password = req.body.password || "";
+  const username = req.body.username.trim();
+  const password = req.body.password;
 
   if (!username || !password) {
     return res.status(400).json({ message: "Missing username or password" });
@@ -32,15 +32,10 @@ router.post(`${API}/auth/login`, authLimiter, async (req, res) => {
     return res.status(401).json({ message: "User does not exist" });
   }
 
-  if (!auth.validatePassword(password, user && user.passwordHash)) {
+  if (!validatePassword(password, user && user.passwordHash)) {
     return res.status(401).json({ message: "Invalid password" });
   }
-
-  // spørgsmål: hvorfor buger vi Promise her?
-  // Vi bruger en Promise her for at håndtere den asynkrone natur af session.regenerate,
-  // som ikke returnerer en Promise i sig selv.
-  // Ved at indpakke det i en Promise kan vi bruge async/await-syntaksen,
-  // hvilket gør koden mere læsbar og lettere at håndtere i tilfælde af fejl.
+  
   return new Promise((resolve) => {
     req.session.regenerate((error) => {
       if (error) {
@@ -75,11 +70,11 @@ router.post(`${API}/auth/logout`, isLoggedIn, (req, res) => {
 
 router.post(`${API}/auth/register`, authLimiter, async (req, res) => {
   try {
-    const username = (req.body.username || "").trim();
-    const fullname = (req.body.fullname || "").trim();
-    const email = (req.body.email || "").trim().toLowerCase();
-    const password = req.body.password || "";
-    const confirmPassword = req.body.confirmPassword || "";
+    const username = req.body.username.trim();
+    const fullname = req.body.fullname.trim();
+    const email = req.body.email.trim().toLowerCase();
+    const password = req.body.password;
+    const confirmPassword = req.body.confirmPassword;
 
     if (!username || !fullname || !email || !password || !confirmPassword) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -116,7 +111,7 @@ router.post(`${API}/auth/register`, authLimiter, async (req, res) => {
       return res.status(409).json({ message: "Email already in use" });
     }
 
-    const hashedPassword = auth.encryptPassword(password);
+    const hashedPassword = encryptPassword(password);
 
     await db.query(userQueries.insertUser, [null, username, email, hashedPassword, "user"]);
 

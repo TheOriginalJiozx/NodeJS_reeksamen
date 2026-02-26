@@ -1,13 +1,14 @@
-import { toast } from "../store/toastStore.js";
+import { apiFetch } from "../lib/api.js";
+import notifier from "../lib/notifier.js";
 import logger from "../lib/logger.js";
-import apiFetch from "../lib/api.js";
-export let baseURL = "/api";
 
-export async function handleCreate(payload, files) {
+const baseURL = "/api";
+
+async function handleCreate(payload, files) {
   const filesArray = Array.isArray(files) ? files : files ? [files] : [];
   let imageUrls = [];
   if (!filesArray.length) {
-    toast("At least one image is required", "error");
+    notifier.error("At least one image is required");
     return { ok: false };
   }
 
@@ -34,13 +35,13 @@ export async function handleCreate(payload, files) {
   const { create, isCarCreate, createBrand, createModel, createYear } = payload;
   if (isCarCreate) {
     if (!createBrand || !createModel || !createYear) {
-      toast("Brand, model and year are required for a car", "error");
+      notifier.error("Brand, model and year are required for a car");
       return { ok: false };
     }
     finalName = `${createBrand} ${createModel} ${createYear}`;
   } else {
     if (!create.name) {
-      toast("Room name is required", "error");
+      notifier.error("Room name is required");
       return { ok: false };
     }
     finalName = create.name;
@@ -54,22 +55,22 @@ export async function handleCreate(payload, files) {
   });
 
   let data = {};
-  const content = res.headers.get("content-type") || "";
+  const content = res.headers.get("content-type");
   if (content.includes("application/json")) data = await res.json();
   else data = { message: await res.text() };
 
   if (!res.ok) {
-    toast(data.message || "Failed to create resource", "error");
+    notifier.error(data.message || "Failed to create resource");
     return { ok: false, data };
   }
 
-  toast(data.message || "Resource created", "success");
+  notifier.success(data.message || "Resource created");
   return { ok: true, data };
 }
 
-export async function handleAddAvailability(available) {
+async function handleAddAvailability(available) {
   if (!available || !available.resourceId) {
-    toast("Select a resource before adding availability", "error");
+    notifier.error("Select a resource before adding availability");
     return { ok: false };
   }
 
@@ -80,20 +81,20 @@ export async function handleAddAvailability(available) {
   });
 
   let data = {};
-  const content = res.headers.get("content-type") || "";
+  const content = res.headers.get("content-type");
   if (content.includes("application/json")) data = await res.json();
   else data = { message: await res.text() };
 
   if (!res.ok) {
-    toast(data.message || "Failed to add availability", "error");
+    notifier.error(data.message || "Failed to add availability");
     return { ok: false, data };
   }
 
-  toast(data.message || "Availability added", "success");
+  notifier.success(data.message || "Availability added");
   return { ok: true, data };
 }
 
-export async function handleBooking(booking) {
+async function handleBooking(booking) {
   const response = await apiFetch(`${baseURL}/bookings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -101,15 +102,21 @@ export async function handleBooking(booking) {
   });
 
   let data = {};
-  const content = response.headers.get("content-type") || "";
+  const content = response.headers.get("content-type");
   if (content.includes("application/json")) data = await response.json();
   else data = { message: await response.text() };
 
   if (!response.ok) {
-    toast(data.message || "Failed to create booking", "error");
+    notifier.error(data.message || "Failed to create booking");
     return { ok: false, data };
   }
 
-  toast(data.message || "Booking complete", "success");
+  notifier.success(data.message || "Booking complete");
   return { ok: true, data };
 }
+
+export default {
+  handleCreate,
+  handleAddAvailability,
+  handleBooking,
+};

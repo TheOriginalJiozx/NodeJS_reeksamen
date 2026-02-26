@@ -1,6 +1,5 @@
 <script>
   import { onDestroy } from "svelte";
-  import logger from "../../lib/logger.js";
 
   export let images = [];
   export let resourceName = "";

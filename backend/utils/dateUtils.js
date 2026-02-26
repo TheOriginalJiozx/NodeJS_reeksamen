@@ -1,4 +1,4 @@
-export const datesBetween = (start, end) => {
+const datesBetween = (start, end) => {
   const dates = [];
   const startDate = new Date(start);
   const endDate = new Date(end);
@@ -13,3 +13,5 @@ export const datesBetween = (start, end) => {
 
   return dates;
 };
+
+export { datesBetween };

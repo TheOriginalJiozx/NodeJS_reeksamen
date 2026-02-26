@@ -1,15 +1,15 @@
 import { writable } from "svelte/store";
 import logger from "../lib/logger.js";
-import apiFetch from "../lib/api.js";
+import { apiFetch } from "../lib/api.js";
 
-const user = writable(null);
+const authUser = writable(null);
 const userMessage = writable("");
 const ready = writable(false);
 
 let bootstrapped = false;
 let bootstrapPromise = null;
 
-export async function bootstrap() {
+async function bootstrap() {
   if (bootstrapped) return bootstrapPromise;
   bootstrapped = true;
 
@@ -19,9 +19,9 @@ export async function bootstrap() {
         const cached = localStorage.getItem("user");
         if (cached) {
           try {
-            user.set(JSON.parse(cached));
+            authUser.set(JSON.parse(cached));
           } catch (error) { logger.warn("Could not parse cached user JSON, using raw value", error && error.message ? error.message : error);
-            user.set(cached);
+            authUser.set(cached);
           }
         }
       } catch (error) {
@@ -38,7 +38,7 @@ export async function bootstrap() {
         }
 
         if (!parsed || !parsed.id) {
-          user.set(null);
+          authUser.set(null);
           userMessage.set("Not authenticated");
           try {
             localStorage.removeItem("user");
@@ -52,7 +52,7 @@ export async function bootstrap() {
         const res = await apiFetch(fetchUrl, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
-          user.set(data.user || null);
+          authUser.set(data.user || null);
           try {
             localStorage.setItem("user", JSON.stringify(data.user || null));
           } catch (error) {
@@ -62,7 +62,7 @@ export async function bootstrap() {
           return;
         }
 
-        user.set(null);
+        authUser.set(null);
         try {
           localStorage.removeItem("user");
         } catch (error) {
@@ -81,8 +81,8 @@ export async function bootstrap() {
   return bootstrapPromise;
 }
 
-export function setUser(username) {
-  user.set(username);
+function setUser(username) {
+  authUser.set(username);
   try {
     localStorage.setItem("user", JSON.stringify(username));
   } catch (error) {
@@ -91,8 +91,8 @@ export function setUser(username) {
   userMessage.set("");
 }
 
-export function clearUser() {
-  user.set(null);
+function clearUser() {
+  authUser.set(null);
   try {
     localStorage.removeItem("user");
   } catch (error) {
@@ -105,5 +105,4 @@ if (typeof window !== "undefined") {
   bootstrap();
 }
 
-export { userMessage, ready };
-export default user;
+export { authUser, userMessage, ready, bootstrap, setUser, clearUser };

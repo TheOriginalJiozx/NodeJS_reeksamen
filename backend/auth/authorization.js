@@ -1,6 +1,6 @@
 import logger from "../lib/logger.js";
 
-export function requireRole(role) {
+function requireRole(role) {
   return function (req, res, next) {
     try {
       if (req.user && req.user.role === role) return next();
@@ -12,9 +12,9 @@ export function requireRole(role) {
   };
 }
 
-export const requireAdmin = requireRole("admin");
+const requireAdmin = requireRole("admin");
 
-export function allowSelfOrAdmin(paramName = "id") {
+function allowSelfOrAdmin(paramName = "id") {
   return function (req, res, next) {
     try {
       const idParameter = req.params && req.params[paramName];
@@ -29,5 +29,4 @@ export function allowSelfOrAdmin(paramName = "id") {
   };
 }
 
-const authorization = { requireRole, requireAdmin, allowSelfOrAdmin };
-export default authorization;
+export { requireRole, requireAdmin, allowSelfOrAdmin };

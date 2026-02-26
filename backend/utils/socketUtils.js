@@ -1,4 +1,4 @@
-export function extractSessionIdFromCookie(cookieHeader) {
+function extractSessionIdFromCookie(cookieHeader) {
   if (!cookieHeader) return null;
   const match = cookieHeader.match(/connect\.sid=([^;]+)/);
   if (!match) return null;
@@ -10,16 +10,12 @@ export function extractSessionIdFromCookie(cookieHeader) {
   return raw;
 }
 
-export async function getSessionByCookieHeader(cookieHeader, sessionStore, logger) {
+async function getSessionByCookieHeader(cookieHeader, sessionStore, logger) {
   try {
     const sessionId = extractSessionIdFromCookie(cookieHeader);
     if (!sessionId) return null;
     const store = sessionStore;
     if (!store || typeof store.get !== "function") return null;
-    // spørgsmål: hvorfor bruger vi en Promise her?
-    // Vi bruger en Promise her for at gøre den callback-baserede sessionStore.get-metode kompatibel med async/await-syntaksen.
-    // sessionStore.get forventer en callback-funktion, der kaldes med resultatet, men ved at indpakke det i en Promise kan vi bruge await for at vente på resultatet,
-    // hvilket gør koden mere læsbar og lettere at håndtere i tilfælde af fejl.
     return await new Promise((resolve) => {
       store.get(sessionId, (error, session) => {
         if (error) {
@@ -37,7 +33,7 @@ export async function getSessionByCookieHeader(cookieHeader, sessionStore, logge
   }
 }
 
-export default function initializeSocket(io, sessionStore, logger) {
+function initializeSocket(io, sessionStore, logger) {
   io.on("connection", (socket) => {
     logger.info("Socket connected", socket.id);
 
@@ -81,23 +77,25 @@ export default function initializeSocket(io, sessionStore, logger) {
 
     socket.on("joinUser", async (payload) => {
       try {
-        const usernameParam = payload && payload.username ? String(payload.username) : null;
-        if (!usernameParam) return;
+        const usernameParameter = payload && payload.username ? String(payload.username) : null;
+        if (!usernameParameter) return;
         const cookieHeader = socket.handshake && socket.handshake.headers ? socket.handshake.headers.cookie : "";
         const session = await getSessionByCookieHeader(cookieHeader, sessionStore, logger);
         const username = session && session.user ? session.user.username : null;
+        const fullname = session && session.user ? session.user.fullname : null;
         if (!username) {
           logger.warn(`Unauthorized socket joinUser attempt ${socket.id}`);
           return;
         }
-        if (String(username) !== String(usernameParam)) {
-          logger.warn(`Socket ${socket.id} attempted to join user room for different user (${usernameParam})`);
+
+        if (String(username) !== String(usernameParameter) && String(fullname) !== String(usernameParameter)) {
+          logger.warn(`Socket ${socket.id} attempted to join user room for different user (${usernameParameter})`);
           return;
         }
-        socket.join(`user:${username}`);
+        socket.join(`user:${usernameParameter}`);
         socket.data = socket.data || {};
         socket.data.user = username;
-        logger.info(`Socket ${socket.id} (${username}) joined user:${username}`);
+        logger.info(`Socket ${socket.id} (${username}) joined user:${usernameParameter}`);
       } catch (error) {
         logger.warn("joinUser handler error", error && error.message ? error.message : error);
       }
@@ -110,13 +108,15 @@ export default function initializeSocket(io, sessionStore, logger) {
         const cookieHeader = socket.handshake && socket.handshake.headers ? socket.handshake.headers.cookie : "";
         const session = await getSessionByCookieHeader(cookieHeader, sessionStore, logger);
         const username = session && session.user ? session.user.username : null;
+        const fullname = session && session.user ? session.user.fullname : null;
         if (!username) {
           logger.warn(`Unauthorized socket leaveUser attempt ${socket.id}`);
           return;
         }
-        if (String(username) !== String(usernameParam)) return;
-        socket.leave(`user:${username}`);
-        logger.info(`Socket ${socket.id} (${username}) left user:${username}`);
+
+        if (String(username) !== String(usernameParam) && String(fullname) !== String(usernameParam)) return;
+        socket.leave(`user:${usernameParam}`);
+        logger.info(`Socket ${socket.id} (${username}) left user:${usernameParam}`);
       } catch (error) {
         logger.warn("leaveUser handler error", error && error.message ? error.message : error);
       }
@@ -145,3 +145,5 @@ export default function initializeSocket(io, sessionStore, logger) {
     });
   });
 }
+
+export { extractSessionIdFromCookie, getSessionByCookieHeader, initializeSocket };

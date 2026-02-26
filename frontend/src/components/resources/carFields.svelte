@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import apiFetch from "../../lib/api.js";
+  import { apiFetch } from "../../lib/api.js";
   import logger from "../../lib/logger.js";
 
   export let createBrand = "";
@@ -29,16 +29,21 @@
     }
   });
 
-  async function loadModelsForBrand(brandId) {
-    if (!brandId) {
+  async function loadModelsForBrand(brandName) {
+    if (!brandName) {
       models = [];
       return;
     }
     try {
-      const response = await apiFetch(`/api/car-brands/${brandId}/models`);
+      const brand = brands.find(brand => brand.name === brandName);
+      if (!brand) {
+        models = [];
+        return;
+      }
+      const response = await apiFetch(`/api/car-brands/${brand.id}/models`);
       const modelsData = response.ok ? await response.json() : [];
       models = modelsData || [];
-      logger.debug({ brandId, modelsCount: models.length }, "Loaded car models for brand");
+      logger.debug({ brandName, modelsCount: models.length }, "Loaded car models for brand");
     } catch (error) {
       logger.error("Failed to load car models", error && error.message ? error.message : error);
       models = [];
@@ -58,7 +63,7 @@
   <select class="border rounded p-2" bind:value={createBrand} disabled={loading}>
       <option value="">Brand</option>
       {#each brands as brand}
-        <option value={brand.id}>{brand.name}</option>
+        <option value={brand.name}>{brand.name}</option>
       {/each}
       <option value="Other">Other</option>
     </select>

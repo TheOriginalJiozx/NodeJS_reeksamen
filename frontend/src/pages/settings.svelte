@@ -1,9 +1,9 @@
 <script>
   import { onMount } from "svelte";
-  import apiFetch from "../lib/api.js";
+  import { apiFetch } from "../lib/api.js";
   import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
-  import { loadAuthenticatedUser } from "../utils/authUtils.js";
+  import authUtils from "../utils/authUtils.js";
 
   let loading = true;
   let currentUser = null;
@@ -22,7 +22,7 @@
   onMount(async () => {
     loading = true;
     try {
-      const parsed = loadAuthenticatedUser();
+      const parsed = authUtils.loadAuthenticatedUser();
       if (!parsed || !parsed.id) {
         currentUser = null;
         return;

@@ -2,9 +2,9 @@ import { writable } from "svelte/store";
 import logger from "./logger";
 
 const initial = typeof window !== "undefined" ? window.location.pathname : "/";
-export const route = writable(initial);
+const route = writable(initial);
 
-export function navigate(to) {
+function navigate(to) {
   if (typeof window === "undefined") return;
   if (to === window.location.pathname) {
     route.set(to);
@@ -35,4 +35,4 @@ if (typeof window !== "undefined") {
   window.addEventListener("popstate", () => route.set(window.location.pathname));
 }
 
-export default { route, navigate };
+export { route, navigate };

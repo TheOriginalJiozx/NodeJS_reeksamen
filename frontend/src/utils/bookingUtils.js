@@ -1,4 +1,4 @@
-export const today = (() => {
+const today = (() => {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -6,7 +6,7 @@ export const today = (() => {
   return `${year}-${month}-${day}`;
 })();
 
-export function groupContinuousDates(dates) {
+function groupContinuousDates(dates) {
   const ranges = [];
   if (!dates || dates.length === 0) return ranges;
   let start = dates[0];
@@ -39,7 +39,7 @@ export function groupContinuousDates(dates) {
   return ranges;
 }
 
-export function formatRange(range) {
+function formatRange(range) {
   if (!range) return "";
 
   const [startYear, startMonth, startDay] = range.start.split("-").map(Number);
@@ -56,7 +56,7 @@ export function formatRange(range) {
   return `${startDay}/${startMonth}/${startYear}-${endDay}/${endMonth}/${endYear}`;
 }
 
-export function nextYMD(date) {
+function nextYMD(date) {
   const [year, month, day] = date.split("-").map(Number);
   const selectable = new Date(year, month - 1, day);
   selectable.setDate(selectable.getDate() + 1);
@@ -66,7 +66,7 @@ export function nextYMD(date) {
   return `${availableYear}-${availableMonth}-${availableDay}`;
 }
 
-export function computeAvailableDatesFromAvailabilities(availabilities) {
+function computeAvailableDatesFromAvailabilities(availabilities) {
   const set = new Set();
   for (const available of availabilities || []) {
     if (!available.startDate || !available.endDate) continue;
@@ -82,7 +82,7 @@ export function computeAvailableDatesFromAvailabilities(availabilities) {
   return Array.from(set).sort();
 }
 
-export function contiguousEndDates(start, availableDatesList) {
+function contiguousEndDates(start, availableDatesList) {
   if (!start) return [];
   const set = new Set(availableDatesList || []);
   const out = [];
@@ -97,3 +97,12 @@ export function contiguousEndDates(start, availableDatesList) {
   }
   return out;
 }
+
+export default {
+  today,
+  groupContinuousDates,
+  formatRange,
+  nextYMD,
+  computeAvailableDatesFromAvailabilities,
+  contiguousEndDates,
+};

@@ -1,82 +1,28 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { navigate } from "../../lib/router.js";
-  import user, { bootstrap } from "../../store/usersStore.js";
-  import notifications, { resourceBookingCount, myBookingCount, pushNotification, clearNotifications } from "../../store/notificationsStore.js";
+  import { authUser, bootstrap } from "../../store/usersStore.js";
+  import { resourceBookingCount, myBookingCount, clearNotifications, pushNotification } from "../../store/notificationsStore.js";
   import notifier from "../../lib/notifier.js";
-  import apiFetch, { clearCsrfCache } from "../../lib/api.js";
+  import { apiFetch, clearCsrfCache } from "../../lib/api.js";
   import { clearAuth } from "../../lib/authentication.js";
   import logger from "../../lib/logger.js";
-  import { loadResourcesWithBookingsAndAvailability } from "../../handlers/resourceHandlers.js";
-  import { fetchUserBookings } from "../../fetchers/bookingFetchers.js";
+  import notificationHandlers from "../../handlers/notificationHandlers.js";
 
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
   let navSocket = null;
-  let unsubscribeUser = null;
-
-  async function loadExistingNotifications(userId) {
-    try {
-      const { resources, resourceBookings } = await loadResourcesWithBookingsAndAvailability(userId);
-      const allNotifications = [];
-      
-      resources.forEach((resource) => {
-        const bookings = resourceBookings[String(resource.id)] || [];
-        bookings.forEach((booking) => {
-          if (!booking.confirmed) {
-            allNotifications.push({
-              type: "booking",
-              navTo: "/myresources",
-              bookingId: booking.id,
-              resourceId: resource.id,
-              resourceName: resource.name,
-              bookingDate: booking.bookingDate,
-              bookingEndDate: booking.bookingEndDate,
-            });
-          }
-        });
-      });
-      
-      const userBookings = await fetchUserBookings();
-      userBookings.forEach((booking) => {
-        if (booking.confirmed === true) {
-          allNotifications.push({
-            type: "booking:confirmed",
-            navTo: "/mybookings",
-            bookingId: booking.id,
-            resourceId: booking.resourceId,
-            resourceName: booking.resourceName,
-            bookingDate: booking.bookingDate,
-            bookingEndDate: booking.bookingEndDate,
-          });
-        } else if (booking.confirmed === false && booking.confirmedAt) {
-          allNotifications.push({
-            type: "booking:declined",
-            navTo: "/mybookings",
-            bookingId: booking.id,
-            resourceId: booking.resourceId,
-            resourceName: booking.resourceName,
-            bookingDate: booking.bookingDate,
-            bookingEndDate: booking.bookingEndDate,
-          });
-        }
-      });
-      
-      allNotifications.forEach((notification) => pushNotification(notification));
-    } catch (error) {
-      logger.error("Failed to load existing notifications on login", error && error.message ? error.message : error);
-    }
-  }
+  let unsubscribeAuthUser = null;
 
   onMount(() => {
     bootstrap();
     try {
       const socketUrl = BACKEND_ORIGIN;
-      unsubscribeUser = user.subscribe((value) => {
+      unsubscribeAuthUser = authUser.subscribe((value) => {
         try {
-          if (!value || !value.username) return;
+          if (!value || !value.fullname) return;
           clearNotifications();
-          loadExistingNotifications(value.id);
+          notificationHandlers.loadExistingNotifications(value.id);
           if (navSocket && typeof navSocket.disconnect === "function") {
             try {
               navSocket.disconnect();
@@ -87,13 +33,26 @@
           }
           if (typeof globalThis.io === "function") {
             navSocket = globalThis.io(socketUrl, { withCredentials: true });
+            
+            const emitJoinUser = () => {
+              try {
+                if (value.fullname) {
+                  navSocket.emit("joinUser", { username: value.fullname });
+                  logger.info({ fullname: value.fullname }, "Emitted joinUser with fullname");
+                }
+              } catch (error) {
+                logger.error("Failed to emit joinUser", error && error.message ? error.message : error);
+              }
+            };
+            
+            emitJoinUser();
+            
             navSocket.on("connect", () => {
               try {
                 logger.info("Nav socket connected");
-                navSocket.emit("joinUser", { username: value.username });
-                logger.info({ username: value.username }, "Emitted joinUser");
+                emitJoinUser();
               } catch (error) {
-                logger.error("Failed to emit joinUser on nav socket connection", error && error.message ? error.message : error);
+                logger.error("Failed on nav socket connect", error && error.message ? error.message : error);
               }
             });
 
@@ -143,9 +102,9 @@
   });
 
   onDestroy(() => {
-    if (unsubscribeUser)
+    if (unsubscribeAuthUser)
       try {
-        unsubscribeUser();
+        unsubscribeAuthUser();
       } catch (error) {
         logger.warn("Failed to unsubscribe from user store in navbar on destroy", error && error.message ? error.message : error);
       }
@@ -191,7 +150,7 @@
     </div>
     <div class="space-x-4">
       <a href="/" class="text-black-800 hover:text-black">Home</a>
-      {#if $user}
+      {#if $authUser}
         <a href="/profile" class="text-black-800 hover:text-black">Profile</a>
         <a href="/myresources" class="text-black-800 hover:text-black">
           My Resources
