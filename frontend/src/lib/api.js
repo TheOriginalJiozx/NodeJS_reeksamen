@@ -1,4 +1,5 @@
 import logger from "./logger";
+import notifier from "./notifier";
 
 let cachedCsrf = null;
 
@@ -14,6 +15,7 @@ async function apiFetch(input, options = {}) {
         });
       }
     }
+    
     const response = await fetch(input, requestOptions);
     
     if (response.status === 403 && method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
@@ -30,7 +32,8 @@ async function apiFetch(input, options = {}) {
     
     return response;
   } catch (error) {
-    logger.error("apiFetch network error", error && error.message ? error.message : error);
+    logger.error("apiFetch network error", error?.message || error);
+    notifier.error("Network error: " + (error.message || error));
     throw error;
   }
 }
@@ -44,10 +47,11 @@ async function fetchCsrf() {
       return null;
     }
     const json = await res.json();
-    cachedCsrf = json && json.csrfToken ? json.csrfToken : null;
+    cachedCsrf = json?.csrfToken ?? null;
     return cachedCsrf;
   } catch (error) {
-    logger.error("CSRF token fetch error", error && error.message ? error.message : error);
+    logger.error("CSRF token fetch error", error?.message || error);
+    notifier.error("Failed to fetch CSRF token: " + error.message);
     return null;
   }
 }

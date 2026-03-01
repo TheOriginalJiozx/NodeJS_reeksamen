@@ -1,11 +1,11 @@
-import resourceHandlers from "./resourceHandlers.js";
-import fetchers from "../fetchers/bookingFetchers.js";
+import { fetchUserBookings } from "../fetchers/bookingFetchers.js";
+import { loadResourcesWithBookingsAndAvailability } from "./resourceHandlers.js";
 import { pushNotification } from "../store/notificationsStore.js";
 import logger from "../lib/logger.js";
 
 async function loadExistingNotifications(userId) {
   try {
-    const { resources, resourceBookings } = await resourceHandlers.loadResourcesWithBookingsAndAvailability(userId);
+    const { resources, resourceBookings } = await loadResourcesWithBookingsAndAvailability(userId);
     const allNotifications = [];
 
     resources.forEach((resource) => {
@@ -22,12 +22,26 @@ async function loadExistingNotifications(userId) {
             bookingEndDate: booking.bookingEndDate,
           });
         }
+        
+        if (booking.defect_reported) {
+          allNotifications.push({
+            type: "defect:reported",
+            navTo: "/myresources",
+            bookingId: booking.id,
+            resourceId: resource.id,
+            resourceName: resource.name,
+            booker: booking.booker,
+            defectReport: booking.defect_reported,
+            defectImage: booking.defect_image,
+            message: `Defect reported on ${resource.name} by ${booking.booker}`
+          });
+        }
       });
     });
 
-    const userBookings = await fetchers.fetchUserBookings();
+    const userBookings = await fetchUserBookings();
     userBookings.forEach((booking) => {
-      if (booking.confirmed === true) {
+      if (booking.confirmed === 1) {
         allNotifications.push({
           type: "booking:confirmed",
           navTo: "/mybookings",
@@ -52,10 +66,8 @@ async function loadExistingNotifications(userId) {
 
     allNotifications.forEach((notification) => pushNotification(notification));
   } catch (error) {
-    logger.error("Failed to load existing notifications on login", error && error.message ? error.message : error);
+    logger.error("Failed to load existing notifications on login", error?.message || error);
   }
 }
 
-export default {
-  loadExistingNotifications,
-};
+export { loadExistingNotifications };

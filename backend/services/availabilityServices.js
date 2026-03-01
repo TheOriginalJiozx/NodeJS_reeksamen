@@ -1,7 +1,6 @@
 import db from "../db/connection.js";
 import * as queries from "../db/queries/availabilities.js";
 import * as bookingQueries from "../db/queries/bookings.js";
-import * as resourceQueries from "../db/queries/resources.js";
 import logger from "../lib/logger.js";
 
 async function createAvailabilityTransaction(resourceId, startDate, endDate) {
@@ -9,8 +8,8 @@ async function createAvailabilityTransaction(resourceId, startDate, endDate) {
 
   try {
     await db.query("START TRANSACTION");
-    const result = await db.query(resourceQueries.insertAvailability, [resourceId, startDate, endDate]);
-    insertId = result.rows?.[0]?.insertId ?? null;
+    const result = await db.query(queries.insertAvailability, [resourceId, startDate, endDate]);
+    insertId = result.insertId ?? null;
     await db.query("COMMIT");
   } catch (transactionError) {
     try {

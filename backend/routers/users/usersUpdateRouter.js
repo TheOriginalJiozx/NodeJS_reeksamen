@@ -1,20 +1,16 @@
 import { Router } from "express";
 import db from "../../db/connection.js";
 import * as userQueries from "../../db/queries/users.js";
+import * as resourceQueries from "../../db/queries/resources.js";
 import { isLoggedIn } from "../../middleware/authMiddleware.js";
 import { allowSelfOrAdmin } from "../../auth/authorization.js";
 import logger from "../../lib/logger.js";
-import { encryptPassword, validatePassword } from "../../utils/authorizerUtils.js";
+import { encryptPassword, validatePassword } from "../../utils/passwordUtils.js";
 import { collectSessionIdsForUsername, destroySessionIds } from "../../utils/sessionUtils.js";
+import { isValidId, sendServerError, executeTransaction, updateSessionUser } from "../../utils/usersUpdateRouterUtils.js";
 
 const router = Router();
 const API = "/api";
-
-const isValidId = (id) => !!id && /^[0-9]+$/.test(String(id));
-const sendServerError = (res, tag, error) => {
-  logger.error(error, tag);
-  return res.status(500).json({ message: "Internal server error" });
-};
 
 router.patch(`${API}/users/:id/username`, isLoggedIn, allowSelfOrAdmin(), async (req, res) => {
   const idParameter = req.params.id;
@@ -28,7 +24,7 @@ router.patch(`${API}/users/:id/username`, isLoggedIn, allowSelfOrAdmin(), async 
     const existing = userRow.rows?.[0];
     if (!existing) return res.status(404).json({ message: "User not found" });
 
-    if (!/^[A-Za-z0-9_]+$/.test(newUsername)) {
+    if (!/^[A-Za-zÆØÅæøå0-9_]+$/.test(newUsername)) {
       return res.status(400).json({ message: "Username may only contain letters, numbers and underscores" });
     }
 
@@ -43,27 +39,16 @@ router.patch(`${API}/users/:id/username`, isLoggedIn, allowSelfOrAdmin(), async 
 
     const oldUsername = existing.username;
     
-    try {
-      await db.query("START TRANSACTION");
-      await db.query(userQueries.updateUsername, [newUsername, idParameter]);
-      await db.query(userQueries.updateBookingsBooker, [newUsername, oldUsername]);
-      await db.query("COMMIT");
-    } catch (transactionError) {
-      try {
-        await db.query("ROLLBACK");
-      } catch (rollbackError) {
-        logger.error(rollbackError, "Failed rollback after username update error");
-      }
-      return sendServerError(res, "PATCH /api/users/:id/username transaction error", transactionError);
+    const transactionResult = await executeTransaction([
+      { sql: userQueries.updateUsername, params: [newUsername, idParameter] },
+      { sql: userQueries.updateBookingsBooker, params: [newUsername, oldUsername] },
+    ]);
+
+    if (!transactionResult.ok) {
+      return sendServerError(res, "PATCH /api/users/:id/username transaction error", transactionResult.error);
     }
 
-    try {
-      if (req.session?.user?.id && String(req.session.user.id) === String(idParameter)) {
-        req.session.user.username = newUsername;
-      }
-    } catch (error) {
-      logger.debug("Could not update session username after change", error);
-    }
+    updateSessionUser(req, idParameter, { username: newUsername });
 
     try {
       const ids = await collectSessionIdsForUsername(req.sessionStore, oldUsername);
@@ -87,26 +72,35 @@ router.patch(`${API}/users/:id/fullname`, isLoggedIn, allowSelfOrAdmin(), async 
     newFullName = newFullName ? String(newFullName).trim() : null;
     if (!newFullName) return res.status(400).json({ message: "New fullname required" });
 
+    if (newFullName.length < 2 || newFullName.length > 100) {
+      return res.status(400).json({ message: "Fullname must be between 2 and 100 characters" });
+    }
+
+    if (!/^[A-Za-zÆØÅæøå\s-]+$/.test(newFullName)) {
+      return res.status(400).json({ message: "Fullname may only contain letters, spaces and hyphens (no numbers)" });
+    }
+
     const userRow = await db.query(userQueries.selectUserById, [idParameter]);
-    const existing = userRow.rows?.[0];
+    const existing = userRow.rows[0];
     if (!existing) return res.status(404).json({ message: "User not found" });
 
     if (newFullName === existing.fullname) {
       return res.status(400).json({ message: "New fullname must be different from current fullname" });
     }
 
-    if (!/^[A-Za-z0-9\s-]+$/.test(newFullName)) {
-      return res.status(400).json({ message: "Fullname may only contain letters, numbers, spaces and hyphens" });
-    }
-
-    await db.query(userQueries.updateFullName, [newFullName, idParameter]);
-    
     try {
-      if (req.session?.user?.id && String(req.session.user.id) === String(idParameter)) {
-        req.session.user.fullname = newFullName;
+      const transactionResult = await executeTransaction([
+        { sql: userQueries.updateFullName, params: [newFullName, idParameter] },
+        { sql: resourceQueries.updateResourceOwner, params: [newFullName, existing.fullname] },
+      ]);
+
+      if (!transactionResult.ok) {
+        return sendServerError(res, "PATCH /api/users/:id/fullname transaction error", transactionResult.error);
       }
+
+      updateSessionUser(req, idParameter, { fullname: newFullName });
     } catch (error) {
-      logger.debug("Could not update session fullname after change", error);
+      return sendServerError(res, "PATCH /api/users/:id/fullname error", error);
     }
 
     return res.status(200).json({ message: "Fullname updated" });
@@ -130,19 +124,38 @@ router.patch(`${API}/users/:id/password`, isLoggedIn, allowSelfOrAdmin(), async 
       return res.status(400).json({ message: "Passwords do not match" });
     }
 
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    if (/\s/.test(newPassword)) {
+      return res.status(400).json({ message: "Password cannot contain spaces" });
+    }
+
     const userRow = await db.query(userQueries.selectUserById, [idParameter]);
-    const existing = userRow.rows?.[0];
+    const existing = userRow.rows[0];
     if (!existing) return res.status(404).json({ message: "User not found" });
 
     const loginRow = await db.query(userQueries.selectUserForLogin, [existing.username]);
-    const stored = loginRow.rows?.[0]?.passwordHash || null;
+    const stored = loginRow.rows[0].passwordHash || null;
     
     if (!validatePassword(currentPassword, stored)) {
       return res.status(403).json({ message: "Current password incorrect" });
     }
 
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ message: "New password must be different from current password" });
+    }
+
     const hashed = encryptPassword(newPassword);
-    await db.query(userQueries.updatePasswordHash, [hashed, idParameter]);
+    
+    const transactionResult = await executeTransaction([
+      { sql: userQueries.updatePasswordHash, params: [hashed, idParameter] },
+    ]);
+
+    if (!transactionResult.ok) {
+      return sendServerError(res, "PATCH /api/users/:id/password transaction error", transactionResult.error);
+    }
 
     return res.status(200).json({ message: "Password updated" });
   } catch (error) {

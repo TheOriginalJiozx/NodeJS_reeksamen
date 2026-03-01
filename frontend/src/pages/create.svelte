@@ -1,6 +1,6 @@
 <script>
   import CreateResource from "../components/resources/createResource.svelte";
-  import AddAvailability from "../components/availability/addAvailability.svelte";
+  import AddAvailability from "../components/availabilities/addAvailabilities.svelte";
 </script>
 
 <div class="container mx-auto px-4">

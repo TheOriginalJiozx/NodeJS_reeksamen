@@ -9,7 +9,7 @@ async function createResourceTransaction(name, typeName, owner, imageUrl) {
   try {
     await db.query("START TRANSACTION");
     const result = await db.query(queries.insertResource, [name, typeName, owner]);
-    insertId = result.rows?.insertId ?? null;
+    insertId = result.insertId ?? null;
 
     if (insertId && imageUrl) {
       await db.query(queries.updateResourceImage, [imageUrl, insertId]);
@@ -29,14 +29,11 @@ async function createResourceTransaction(name, typeName, owner, imageUrl) {
 
 async function deleteResourceTransaction(resourceId) {
   try {
-    await db.query("START TRANSACTION");
     await db.query(queries.deleteBookingsByResource, [resourceId]).catch(() => {});
     await db.query(queries.deleteAvailabilitiesByResource, [resourceId]).catch(() => {});
     await db.query(queries.deleteResource, [resourceId]);
-    await db.query("COMMIT");
   } catch (transactionError) {
-    logger.error(transactionError, "deleteResourceTransaction error, rolling back");
-    await db.query("ROLLBACK").catch(() => {});
+    logger.error(transactionError, "deleteResourceTransaction error");
     throw transactionError;
   }
 }

@@ -23,7 +23,7 @@
       brands = brandsData || [];
       logger.debug({ brandsCount: brands.length }, "Loaded car brands");
     } catch (error) {
-      logger.error("Failed to load car brands", error && error.message ? error.message : error);
+      logger.error("Failed to load car brands", error?.message || error);
     } finally {
       loading = false;
     }
@@ -45,7 +45,7 @@
       models = modelsData || [];
       logger.debug({ brandName, modelsCount: models.length }, "Loaded car models for brand");
     } catch (error) {
-      logger.error("Failed to load car models", error && error.message ? error.message : error);
+      logger.error("Failed to load car models", error?.message || error);
       models = [];
     }
   }

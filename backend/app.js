@@ -5,7 +5,6 @@ import session from "express-session";
 import expressMySQLSession from "express-mysql-session";
 import { sessionOptions } from "./db/connection.js";
 import cors from "cors";
-import crypto from "crypto";
 import { Server } from "socket.io";
 import http from "http";
 import authRouter from "./routers/users/authRouter.js";
@@ -14,17 +13,21 @@ import usersUpdateRouter from "./routers/users/usersUpdateRouter.js";
 import usersExportRouter from "./routers/users/usersExportRouter.js";
 import bookingsRouter from "./routers/bookings/bookingsRouter.js";
 import bookingsActionsRouter from "./routers/bookings/bookingsActionsRouter.js";
+import markSeenRouter from "./routers/bookings/markSeenRouter.js";
 import resourcesRouter from "./routers/resources/resourcesRouter.js";
+import availabilitiesRouter from "./routers/resources/availabilitiesRouter.js";
 import typesRouter from "./routers/types/typesRouter.js";
 import uploadsRouter from "./routers/uploads/uploadsRouter.js";
 import carBrandsRouter from "./routers/carBrands/carBrandsRouter.js";
+import csrfRouter from "./routers/csrf/csrfRouter.js";
 import { initializeSocket } from "./utils/socketUtils.js";
 import csrfMiddleware from "./middleware/csrfMiddleware.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
-const NODE_ENV = process.env.NODE_ENV || "development";
+const NODE_ENV = process.env.NODE_ENV;
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
+
 if (!SESSION_SECRET) {
   logger.error("Environment variable SESSION_SECRET is not set. Set SESSION_SECRET and restart the server.");
   process.exit(1);
@@ -80,22 +83,9 @@ app.use(
 app.use(
   "/api",
   csrfMiddleware({
-    exemptPaths: ["/auth/login", "/auth/register", "/auth/logout", "/users", "/csrf-token"],
+    exemptPaths: ["/auth/login", "/auth/register", "/auth/logout", "/users", "/users/export", "/csrf-token", "/resources", "/bookings"],
   }),
 );
-
-app.get("/api/csrf-token", (req, res) => {
-  try {
-    if (!req.session) return res.status(500).json({ message: "Session not available" });
-    if (!req.session.csrfToken) {
-      req.session.csrfToken = crypto.randomBytes(24).toString("hex");
-    }
-    return res.status(200).json({ csrfToken: req.session.csrfToken });
-  } catch (error) {
-    logger.error(error, "Could not generate CSRF token");
-    return res.status(500).json({ message: "Could not generate CSRF token" });
-  }
-});
 
 let io;
 
@@ -108,14 +98,16 @@ const dependencyInjector = (req, res, next) => {
 };
 
 app.use(dependencyInjector);
-
+app.use(csrfRouter);
+app.use(usersExportRouter);
 app.use(authRouter);
 app.use(usersRouter);
 app.use(usersUpdateRouter);
-app.use(usersExportRouter);
 app.use(bookingsRouter);
 app.use(bookingsActionsRouter);
+app.use(markSeenRouter);
 app.use(resourcesRouter);
+app.use(availabilitiesRouter);
 app.use(typesRouter);
 app.use(uploadsRouter);
 app.use(carBrandsRouter);
@@ -125,8 +117,8 @@ app.use((req, res) => {
   return res.status(404).json({ message: "Endpoint not found" });
 });
 
-app.use((error, req, res, next) => {
-  if (error && error.code === "EBADCSRFTOKEN") {
+app.use((error, req, res, _next) => {
+  if (error?.code === "EBADCSRFTOKEN") {
     logger.warn("Invalid CSRF token");
     return res.status(403).json({ message: "Invalid CSRF token" });
   }

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { encryptPassword, validatePassword } from "../../utils/authorizerUtils.js";
+import { encryptPassword, validatePassword } from "../../utils/passwordUtils.js";
 import db from "../../db/connection.js";
 import * as userQueries from "../../db/queries/users.js";
 import { rateLimit } from "express-rate-limit";
@@ -84,12 +84,24 @@ router.post(`${API}/auth/register`, authLimiter, async (req, res) => {
       return res.status(400).json({ message: "Passwords do not match" });
     }
 
-    if (!/^[A-Za-z0-9_]+$/.test(username)) {
+    if (!/^[A-Za-zÆØÅæøå0-9_]+$/.test(username)) {
       return res.status(400).json({ message: "Username may only contain letters, numbers and underscores" });
     }
 
-    if (!/^[A-Za-z0-9\s-]+$/.test(fullname)) {
-      return res.status(400).json({ message: "Fullname may only contain letters, numbers, spaces and hyphens" });
+    if (!/^[A-Za-zÆØÅæøå\s-]+$/.test(fullname)) {
+      return res.status(400).json({ message: "Fullname may only contain letters, spaces and hyphens (no numbers)" });
+    }
+
+    if (fullname.length < 2 || fullname.length > 100) {
+      return res.status(400).json({ message: "Fullname must be between 2 and 100 characters" });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    if (/\s/.test(password)) {
+      return res.status(400).json({ message: "Password cannot contain spaces" });
     }
 
     if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
@@ -113,7 +125,7 @@ router.post(`${API}/auth/register`, authLimiter, async (req, res) => {
 
     const hashedPassword = encryptPassword(password);
 
-    await db.query(userQueries.insertUser, [null, username, email, hashedPassword, "user"]);
+    await db.query(userQueries.insertUser, [fullname, username, email, hashedPassword, "user"]);
 
     return res.status(201).json({ message: "User registered successfully" });
   } catch (error) {

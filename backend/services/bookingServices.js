@@ -48,15 +48,7 @@ async function createBookingTransaction(booker, resourceId, startDate, endDate, 
       const image = await db.query(queries.selectImageForResource, [resourceId]);
       if (image.rowCount && image.rows[0] && image.rows[0].image) resourceImage = image.rows[0].image;
     } catch (error) {
-      logger.debug("Could not fetch resource image for booking", error && error.message ? error.message : error);
-    }
-
-    if (insertId && resourceImage) {
-      try {
-        await db.query(queries.updateBookingImage, [resourceImage, insertId]);
-      } catch (error) {
-        logger.debug("Could not save image URL to bookings table", error && error.message ? error.message : error);
-      }
+      logger.debug("Could not fetch resource image for booking", error?.message || error);
     }
 
     await db.query("COMMIT");

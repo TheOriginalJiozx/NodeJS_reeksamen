@@ -1,13 +1,13 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { navigate } from "../../lib/router.js";
-  import { authUser, bootstrap } from "../../store/usersStore.js";
-  import { resourceBookingCount, myBookingCount, clearNotifications, pushNotification } from "../../store/notificationsStore.js";
-  import notifier from "../../lib/notifier.js";
-  import { apiFetch, clearCsrfCache } from "../../lib/api.js";
-  import { clearAuth } from "../../lib/authentication.js";
+  import { authUser, bootstrap } from "../../lib/auth.js";
+  import { resourceBookingCount, defectReportedCount, defectedBookingCount, clearNotifications, unseenBookingsCount } from "../../store/notificationsStore.js";
   import logger from "../../lib/logger.js";
-  import notificationHandlers from "../../handlers/notificationHandlers.js";
+  import { loadExistingNotifications } from "../../handlers/notificationHandlers.js";
+  import { fetchDefectCount } from "../../fetchers/defectCountersFetcher.js";
+  import { setupNavbarSocket } from "../../utils/navbarSocketUtils.js";
+  import { handleLogout as handleLogoutUtil } from "../../handlers/logoutHandler.js";
 
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
@@ -22,82 +22,75 @@
         try {
           if (!value || !value.fullname) return;
           clearNotifications();
-          notificationHandlers.loadExistingNotifications(value.id);
+          loadExistingNotifications(value.id);
+          
+          fetchDefectCount().then((result) => {
+            if (result.ok) {
+              defectedBookingCount.set(result.count);
+            }
+          }).catch((error) => {
+            logger.warn("Failed to load defect count", error?.message || error);
+          });
+
           if (navSocket && typeof navSocket.disconnect === "function") {
             try {
+              navSocket.removeAllListeners?.();
               navSocket.disconnect();
             } catch (error) {
-              logger.warn("Failed to disconnect previous nav socket connection", error && error.message ? error.message : error);
+              logger.warn("Failed to disconnect previous nav socket connection", error?.message || error);
             }
             navSocket = null;
           }
           if (typeof globalThis.io === "function") {
-            navSocket = globalThis.io(socketUrl, { withCredentials: true });
-            
-            const emitJoinUser = () => {
-              try {
-                if (value.fullname) {
-                  navSocket.emit("joinUser", { username: value.fullname });
-                  logger.info({ fullname: value.fullname }, "Emitted joinUser with fullname");
+            navSocket = setupNavbarSocket(globalThis.io, socketUrl, value.fullname, {
+              onDefectUpdate: async () => {
+                try {
+                  logger.info("[NAVBAR] onDefectUpdate callback triggered - Fetching defected count");
+                  const defResult = await fetch(`${BACKEND_ORIGIN}/api/bookings/defected-count`, {
+                    credentials: "include"
+                  });
+                  if (defResult.ok) {
+                    const defData = await defResult.json();
+                    defectedBookingCount.set(defData.defectCount || 0);
+                    logger.info(`[NAVBAR] onDefectUpdate: Updated defectedBookingCount to ${defData.defectCount}`);
+                  }
+                } catch (error) {
+                  logger.error("[NAVBAR] onDefectUpdate: Failed to update defected count", error?.message || error);
                 }
-              } catch (error) {
-                logger.error("Failed to emit joinUser", error && error.message ? error.message : error);
-              }
-            };
-            
-            emitJoinUser();
-            
-            navSocket.on("connect", () => {
-              try {
-                logger.info("Nav socket connected");
-                emitJoinUser();
-              } catch (error) {
-                logger.error("Failed on nav socket connect", error && error.message ? error.message : error);
-              }
-            });
-
-            navSocket.on("disconnect", () => {
-              logger.warn("Nav socket disconnected");
-            });
-
-            navSocket.on("connect_error", (error) => {
-              logger.error("Nav socket connection error", error);
-            });
-
-            navSocket.on("booking:created", (payload) => {
-              try {
-                logger.debug({ payload }, "Received booking:created");
-                pushNotification({ type: "booking", navTo: "/myresources", ...payload });
-                notifier.info("New booking request");
-              } catch (error) {
-                logger.error("Failed to handle booking:created notification", error && error.message ? error.message : error);
-              }
-            });
-            navSocket.on("booking:confirmed", (payload) => {
-              try {
-                logger.debug({ payload }, "Received booking:confirmed");
-                pushNotification({ type: "booking:confirmed", navTo: "/mybookings", ...payload });
-                notifier.success("A booking was confirmed");
-              } catch (error) {
-                logger.error("Failed to handle booking:confirmed notification", error && error.message ? error.message : error);
-              }
-            });
-            navSocket.on("booking:declined", (payload) => {
-              try {
-                logger.debug({ payload }, "Received booking:declined");
-                pushNotification({ type: "booking:declined", navTo: "/mybookings", ...payload });
-                notifier.error("A booking was declined");
-              } catch (error) {
-                logger.error("Failed to handle booking:declined notification", error && error.message ? error.message : error);
+              },
+              onBookingChange: async () => {
+                try {
+                  const result = await fetch(`${BACKEND_ORIGIN}/api/bookings/unseen-count`, {
+                    credentials: "include"
+                  });
+                  if (result.ok) {
+                    const data = await result.json();
+                    unseenBookingsCount.set(data.unseenCount || 0);
+                  } else {
+                    logger.warn(`FAIL: Unseen count fetch failed with status ${result.status}`);
+                  }
+                  
+                  const defResult = await fetch(`${BACKEND_ORIGIN}/api/bookings/defected-count`, {
+                    credentials: "include"
+                  });
+                  if (defResult.ok) {
+                    const defData = await defResult.json();
+                    defectedBookingCount.set(defData.defectCount || 0);
+                  } else {
+                    logger.warn(`FAIL: Defected count fetch failed with status ${defResult.status}`);
+                  }
+                } catch (error) {
+                  logger.error("EXCEPTION in onBookingChange", error);
+                }
               }
             });
           }
         } catch (error) {
-          logger.warn("Failed to set up nav socket connection on user change", error && error.message ? error.message : error);
+          logger.warn("Failed to set up nav socket connection on user change", error?.message || error);
         }
       });
     } catch (error) {
-      logger.warn("socket setup in navbar failed", error && error.message ? error.message : error);
+      logger.warn("socket setup in navbar failed", error?.message || error);
     }
   });
 
@@ -106,39 +99,20 @@
       try {
         unsubscribeAuthUser();
       } catch (error) {
-        logger.warn("Failed to unsubscribe from user store in navbar on destroy", error && error.message ? error.message : error);
+        logger.warn("Failed to unsubscribe from user store in navbar on destroy", error?.message || error);
       }
     if (navSocket && typeof navSocket.disconnect === "function")
       try {
+        navSocket.removeAllListeners?.();
         navSocket.disconnect();
       } catch (error) {
-        logger.warn("Failed to disconnect nav socket connection on destroy", error && error.message ? error.message : error);
+        logger.warn("Failed to disconnect nav socket connection on destroy", error?.message || error);
       }
   });
 
   async function handleLogout(event) {
     event.preventDefault();
-    try {
-      await apiFetch("/api/auth/logout", { method: "POST" });
-    } catch (error) {
-      notifier.error(error && error.message ? error.message : "Network error");
-    }
-    try {
-      clearAuth();
-    } catch (error) {}
-    try {
-      clearCsrfCache();
-    } catch (error) {
-      logger.error("Error clearing CSRF cache on logout", error && error.message ? error.message : error);
-    }
-    if (navSocket && typeof navSocket.disconnect === "function") {
-      try {
-        navSocket.disconnect();
-      } catch (error) {
-        logger.warn("Failed to disconnect nav socket on logout", error && error.message ? error.message : error);
-      }
-      navSocket = null;
-    }
+    await handleLogoutUtil(navSocket);
     navigate("/login");
   }
 </script>
@@ -157,11 +131,20 @@
           {#if $resourceBookingCount > 0}
             <span class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$resourceBookingCount}</span>
           {/if}
+          {#if $defectReportedCount > 0}
+            <span class="ml-2 inline-block bg-orange-600 text-white text-xs px-2 py-1 rounded">{$defectReportedCount}</span>
+          {/if}
         </a>
         <a href="/mybookings" class="text-black-800 hover:text-black">
           My Bookings
-          {#if $myBookingCount > 0}
-            <span class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$myBookingCount}</span>
+          {#if $unseenBookingsCount > 0}
+            <span class="ml-2 inline-block bg-red-600 text-white text-xs px-2 py-1 rounded">{$unseenBookingsCount}</span>
+          {/if}
+        </a>
+        <a href="/mybookings" class="text-black-800 hover:text-black">
+          Defects (Deleted Resources)
+          {#if $defectedBookingCount > 0}
+            <span class="ml-2 inline-block bg-red-800 text-white text-xs px-2 py-1 rounded">{$defectedBookingCount}</span>
           {/if}
         </a>
         <a href="/settings" class="text-black-800 hover:text-black">Settings</a>

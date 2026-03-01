@@ -18,3 +18,4 @@ export const selectImagesByOwner = `SELECT image FROM resources WHERE owner = ?`
 export const deleteBookingsByOwnerResources = `DELETE FROM bookings WHERE resource_id IN (SELECT id FROM resources WHERE owner = ?)`;
 export const deleteAvailabilitiesByOwnerResources = `DELETE FROM availabilities WHERE resource_id IN (SELECT id FROM resources WHERE owner = ?)`;
 export const deleteResourcesByOwner = `DELETE FROM resources WHERE owner = ?`;
+export const getBookerUserIdByUsername = `SELECT id FROM users WHERE username = ? LIMIT 1`;

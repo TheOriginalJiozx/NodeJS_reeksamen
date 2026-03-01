@@ -10,21 +10,17 @@ async function parseResponse(res) {
       return { message: text };
     }
   } catch (error) {
-    logger.error("Failed to parse response", error && error.message ? error.message : error);
+    logger.error("Failed to parse response", error?.message || error);
     return { message: "Failed to parse response" };
   }
 }
 
 function getErrorMessage(data, defaultMessage = "Operation failed") {
-  return (data && data.message) ? data.message : defaultMessage;
+  return data?.message || defaultMessage;
 }
 
 function getSuccessMessage(data, defaultMessage = "Operation successful") {
-  return (data && data.message) ? data.message : defaultMessage;
+  return data?.message || defaultMessage;
 }
 
-export default {
-  parseResponse,
-  getErrorMessage,
-  getSuccessMessage,
-};
+export { parseResponse, getErrorMessage, getSuccessMessage };

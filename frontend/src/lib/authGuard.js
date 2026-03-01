@@ -1,7 +1,6 @@
 import { navigate, route } from "./router.js";
-import { authUser, ready } from "../store/usersStore.js";
+import { authUser, ready, protectedRoutes } from "./auth.js";
 import logger from "./logger.js";
-import { protectedRoutes } from "./authorization.js";
 
 let currentUser = null;
 let guardActive = false;
@@ -32,10 +31,8 @@ function enforceRouteProtection(routePath) {
       navigate("/login");
     }
   } catch (error) {
-    logger.error("authGuard route protection error", error && error.message ? error.message : error);
+    logger.error("authGuard route protection error", error?.message || error);
   }
 }
 
 initializeRouteGuard();
-
-export { enforceRouteProtection };

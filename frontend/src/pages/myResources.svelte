@@ -4,10 +4,11 @@
   import { apiFetch } from "../lib/api.js";
   import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
+  import { loadExistingNotifications } from "../handlers/notificationHandlers.js";
   import ResourceTable from "../components/resources/resourceTable.svelte";
-  import socketUtils from "../utils/socketUtils.js";
-  import authUtils from "../utils/authUtils.js";
-  import resourceHandlers from "../handlers/resourceHandlers.js";
+  import { setupNavbarSocket, disconnectSocket, joinResourceRoom } from "../utils/navbarSocketUtils.js";
+  import { loadResourcesWithBookingsAndAvailability, confirmBooking, declineBooking, deleteResource, deleteAvailability } from "../handlers/resourceHandlers.js";
+  import { loadAuthenticatedUser } from "../lib/auth.js";
 
   const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_ORIGIN || window.location.origin;
 
@@ -36,35 +37,47 @@
   }
 
   async function fetchResources() {
-    const { resources: res, resourceBookings: newBookings, resourceAvailabilities: newAvailabilities } = await resourceHandlers.loadResourcesWithBookingsAndAvailability(user?.id);
-    resources = res;
-    resourceBookings = newBookings;
-    resourceAvailabilities = newAvailabilities;
-    
-    if (socket) {
-      resources.forEach((resource) => {
-        socketUtils.joinResourceRoom(socket, resource.id);
-      });
+    try {
+      const { resources: res, resourceBookings: newBookings, resourceAvailabilities: newAvailabilities } = await loadResourcesWithBookingsAndAvailability(user?.id);
+      resources = res;
+      resourceBookings = newBookings;
+      resourceAvailabilities = newAvailabilities;
+      
+      if (socket) {
+        resources.forEach((resource) => {
+          joinResourceRoom(socket, resource.id);
+        });
+      }
+    } catch (error) {
+      logger.error("[fetchResources] Error:", error?.message || error);
+      throw error;
     }
   }
 
   async function handleConfirmBooking(bookingId) {
-    if (await resourceHandlers.confirmBooking(bookingId)) {
+    if (await confirmBooking(bookingId)) {
       await fetchResources();
     }
   }
 
   async function handleDeclineBooking(bookingId) {
-    if (await resourceHandlers.declineBooking(bookingId)) {
+    if (await declineBooking(bookingId)) {
       await fetchResources();
     }
   }
 
-  async function handleDeleteResource(id) {
-      const res = await resourceHandlers.deleteResource(id);
+  async function handleDeleteResource(id, isDefect) {
+    const res = await deleteResource(id, isDefect);
     if (res.ok) {
-      resources = resources.filter((resource) => String(resource.id) !== String(id));
       notifier.success("Resource deleted");
+      if (isDefect) {
+        window.location.reload();
+      } else {
+        await fetchResources();
+        if (user?.id) {
+          await loadExistingNotifications(user.id);
+        }
+      }
     } else {
       notifier.error(res.message || "Failed to delete resource");
     }
@@ -76,22 +89,24 @@
   });
 
   onDestroy(() => {
-    socketUtils.disconnectSocket(socket);
+    disconnectSocket(socket);
   });
 
   onMount(async () => {
     try {
-      const parsed = authUtils.loadAuthenticatedUser();
+      const parsed = loadAuthenticatedUser();
       if (!parsed?.id) return navigate("/login");
       const userResponse = await apiFetch(`/api/users/${parsed.id}`, { credentials: "include" });
       if (userResponse.status === 401) return navigate("/login");
       user = (await userResponse.json()).user || null;
       await fetchResources();
 
-      socket = socketUtils.initializeSocket(BACKEND_ORIGIN, user?.fullname, fetchResources);
+      socket = setupNavbarSocket(globalThis.io, BACKEND_ORIGIN, user?.fullname, {
+        onBookingChange: fetchResources,
+      });
     } catch (error) {
       notifier.error("Failed to load resources");
-      logger.error("Failed to fetch user or resources", error && error.message ? error.message : error);
+      logger.error("Failed to fetch user or resources", error?.message || error);
     } finally {
       loading = false;
     }
@@ -120,7 +135,7 @@
             onDeleteResource={handleDeleteResource}
             onConfirmBooking={handleConfirmBooking}
             onDeclineBooking={handleDeclineBooking}
-            onDeleteAvailability={resourceHandlers.deleteAvailability}
+            onDeleteAvailability={deleteAvailability}
           />
         {/if}
       </section>

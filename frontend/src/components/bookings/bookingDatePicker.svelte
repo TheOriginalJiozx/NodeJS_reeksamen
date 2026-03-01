@@ -2,7 +2,7 @@
   import flatpickr from "flatpickr";
   import "flatpickr/dist/flatpickr.min.css";
   import logger from "../../lib/logger.js";
-  import bookingUtils from "../../utils/bookingUtils.js";
+  import { today, contiguousEndDates } from "../../utils/bookingUtils.js";
 
   export let booking = { startDate: "", endDate: "" };
   export let availableDates = [];
@@ -13,23 +13,23 @@
   let endFlatPickr;
 
   $: bookingEndOptions = booking.startDate
-    ? bookingUtils.contiguousEndDates(booking.startDate, availableDates)
+    ? contiguousEndDates(booking.startDate, availableDates)
     : availableDates;
 
   $: if (startFlatPickr) {
     startFlatPickr.set("enable", availableDates || []);
-    startFlatPickr.set("minDate", bookingUtils.today);
+    startFlatPickr.set("minDate", today);
   }
 
   $: if (endFlatPickr) {
     endFlatPickr.set("enable", bookingEndOptions || []);
-    endFlatPickr.set("minDate", booking.startDate || bookingUtils.today);
+    endFlatPickr.set("minDate", booking.startDate || today);
     if (booking.endDate && !bookingEndOptions.includes(booking.endDate)) {
       booking.endDate = "";
       try {
         endFlatPickr.clear();
       } catch (error) {
-        logger.error("Failed to clear end date picker", error && error.message ? error.message : error);
+        logger.error("Failed to clear end date picker", error?.message || error);
       }
     }
   }
@@ -38,13 +38,13 @@
     startFlatPickr = flatpickr(startElement, {
       dateFormat: "Y-m-d",
       enable: availableDates,
-      minDate: bookingUtils.today,
+      minDate: today,
       onChange: (_selectedDates, dateString) => (booking.startDate = dateString),
     });
     endFlatPickr = flatpickr(endElement, {
       dateFormat: "Y-m-d",
       enable: bookingEndOptions,
-      minDate: booking.startDate || bookingUtils.today,
+      minDate: booking.startDate || today,
       onChange: (_selectedDates, dateString) => (booking.endDate = dateString),
     });
   }

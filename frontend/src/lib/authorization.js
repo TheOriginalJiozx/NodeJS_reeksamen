@@ -1,7 +1,11 @@
-const protectedRoutes = new Set(["/profile", "/booking", "/mybookings", "/myresources", "/book", "/create"]);
+import logger from "./logger.js";
 
-function isAdmin(user) {
-  return !!(user && user.role === "admin");
+function handleAuthorizationError(res) {
+  if (res.status === 403) {
+    logger.warn("Access denied - insufficient permissions");
+    return { ok: false, forbidden: true, message: "Access denied" };
+  }
+  return null;
 }
 
-export { protectedRoutes, isAdmin };
+export { handleAuthorizationError };

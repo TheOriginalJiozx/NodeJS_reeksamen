@@ -1,6 +1,6 @@
 import logger from "../lib/logger.js";
 import { apiFetch } from "../lib/api.js";
-import bookingUtils from "../utils/bookingUtils.js";
+import { groupContinuousDates } from "../utils/bookingUtils.js";
 
 const API = "/api";
 
@@ -41,7 +41,7 @@ async function fetchAllResources() {
     } catch (error) {
       logger.warn(
         `Failed to fetch availability for resource ${resource.id}`,
-        error && error.message ? error.message : error,
+        error?.message || error,
       );
     }
   }
@@ -105,7 +105,7 @@ async function fetchAvailability(id) {
     availableDates = computeDatesFromAvailabilities(availability);
   }
 
-    const availableRanges = bookingUtils.groupContinuousDates(availableDates);
+    const availableRanges = groupContinuousDates(availableDates);
   return { availability, availableDates, availableRanges };
 }
 
@@ -119,14 +119,9 @@ async function fetchUserBookings() {
     const data = await response.json();
     return Array.isArray(data.bookings) ? data.bookings : [];
   } catch (error) {
-    logger.error("Failed to fetch user bookings", error && error.message ? error.message : error);
+    logger.error("Failed to fetch user bookings", error?.message || error);
     return [];
   }
 }
 
-export default {
-  fetchAllResources,
-  fetchTypes,
-  fetchAvailability,
-  fetchUserBookings,
-};
+export { fetchAllResources, fetchTypes, fetchAvailability, fetchUserBookings };

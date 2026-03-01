@@ -21,12 +21,26 @@ router.get(`${API}/users/export`, isLoggedIn, async (req, res) => {
   try {
     const result = await db.query(userQueries.selectUserById, [userId]);
     const userData = result.rows[0] || null;
-    const exportData = { user: userData, resources: [], bookings: [], availabilities: [] };
+    
+    const safeUserData = userData ? {
+      id: userData.id,
+      username: userData.username,
+      fullname: userData.fullname,
+      email: userData.email,
+      role: userData.role,
+      created_at: userData.created_at
+    } : null;
+    
+    const exportData = { user: safeUserData, resources: [], bookings: [], availabilities: [] };
+    
     if (userData?.username && userData?.fullname) {
-      exportData.resources = (await db.query(resourceQueries.getOwnedResources, [userData.fullname])).rows || [];
+      const resourcesRaw = (await db.query(resourceQueries.getOwnedResources, [userData.fullname])).rows || [];
+      exportData.resources = resourcesRaw.map(({ id, name, type, owner }) => ({ id, name, type, owner }));
+      
       exportData.bookings = (await db.query(bookingQueries.getBookingsForUserOrOwner, [userData.username])).rows || [];
       exportData.availabilities = (await db.query(availabilityQueries.getAvailabilitiesForOwnerResources, [userData.fullname])).rows || [];
     }
+    
     const payload = JSON.stringify(exportData, null, 2);
     res.setHeader("Content-Disposition", 'attachment; filename="user-data.json"');
     res.setHeader("Content-Type", "application/json");

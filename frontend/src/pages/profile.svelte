@@ -2,13 +2,12 @@
   import { onMount } from "svelte";
   import { navigate } from "../lib/router.js";
   import notifier from "../lib/notifier.js";
-  import { clearAuth } from "../lib/authentication.js";
-  import { authUser } from "../store/usersStore.js";
-  import { isAdmin } from "../lib/authorization.js";
+  import { clearUserSessionAuth, authUser, isAdmin } from "../lib/auth.js";
   import logger from "../lib/logger.js";
   import { apiFetch } from "../lib/api.js";
-  import authUtils from "../utils/authUtils.js";
-  import responseUtils from "../utils/responseUtils.js";
+  import { loadAuthenticatedUser, clearUserCache } from "../lib/auth.js";
+  import { parseResponse } from "../utils/responseUtils.js";
+  import { deleteUserAccount, exportUserData } from "../handlers/userHandlers.js";
 
   let user = null;
   let loading = true;
@@ -19,31 +18,17 @@
     if (!confirm("Are you sure you want to delete your account? This will remove your resources and related data.")) return;
     deleting = true;
     try {
-      const targetId = user && user.id ? user.id : null;
-      if (!targetId) {
-        notifier.error("Invalid user");
-        deleting = false;
-        return;
-      }
-
-      const res = await apiFetch(`/api/users/${targetId}`, { method: "DELETE" });
-      const data = await responseUtils.parseResponse(res);
-
+      const res = await deleteUserAccount(user?.id);
       if (res.ok) {
-        authUtils.clearUserCache();
+        clearUserCache();
         try {
-          clearAuth();
+          clearUserSessionAuth();
         } catch (error) {}
-        notifier.success(responseUtils.getSuccessMessage(data, "Account deleted"));
         navigate("/");
         return;
       }
-
-      const errorMessage = responseUtils.getErrorMessage(data, "Failed to delete account");
-      notifier.error(errorMessage);
     } catch (error) {
-      notifier.error("Failed to delete account");
-      logger.error("Delete account error", error && error.message ? error.message : error);
+      logger.error("Delete account error", error?.message || error);
     } finally {
       deleting = false;
     }
@@ -53,13 +38,12 @@
     if (!confirm("Export your data to a JSON file?")) return;
     exporting = true;
     try {
-      const res = await apiFetch("/api/users/export", { method: "GET" });
-      if (!res.ok) {
-        const error = await responseUtils.parseResponse(res);
-        notifier.error(responseUtils.getErrorMessage(error, "Export failed"));
+      const result = await exportUserData();
+      if (!result.ok) {
         return;
       }
 
+      const res = result.response;
       const blob = await res.blob();
       const disposition = res.headers.get("content-disposition");
       const username = user?.username || "user";
@@ -77,7 +61,7 @@
       URL.revokeObjectURL(url);
       notifier.success("Export complete");
     } catch (error) {
-      logger.error("Export error", error && error.message ? error.message : error);
+      logger.error("Export error", error?.message || error);
       notifier.error("Export failed");
     } finally {
       exporting = false;
@@ -86,7 +70,7 @@
 
   onMount(async () => {
     try {
-      const parsed = authUtils.loadAuthenticatedUser();
+      const parsed = loadAuthenticatedUser();
       if (!parsed) {
         navigate("/login");
         return;
@@ -105,11 +89,11 @@
         return;
       }
 
-      const data = await responseUtils.parseResponse(res);
+      const data = await parseResponse(res);
       user = data.user || null;
     } catch (error) {
       notifier.error("Failed to load profile");
-      logger.error("Profile fetch error", error && error.message ? error.message : error);
+      logger.error("Profile fetch error", error?.message || error);
     } finally {
       loading = false;
     }

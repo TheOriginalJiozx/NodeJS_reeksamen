@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import bookingFetchers from "../../fetchers/bookingFetchers.js";
-  import bookingHandlers from "../../handlers/bookingHandlers.js";
+  import { fetchAvailability, fetchAllResources } from "../../fetchers/bookingFetchers.js";
+  import { handleBooking } from "../../handlers/bookingHandlers.js";
   import notifier from "../../lib/notifier.js";
   import BookingDatePicker from "./bookingDatePicker.svelte";
   import BookingImagePreview from "./bookingImagePreview.svelte";
@@ -29,12 +29,12 @@
       availableDates = [];
       return;
     }
-    const fetch = await bookingFetchers.fetchAvailability(id);
+    const fetch = await fetchAvailability(id);
     availableDates = fetch.availableDates || [];
   }
 
   onMount(async () => {
-    resourcesAll = (await bookingFetchers.fetchAllResources()).resourcesAll || [];
+    resourcesAll = (await fetchAllResources()).resourcesAll || [];
     if (resourcesAll.length && !booking.resourceId) booking.resourceId = resourcesAll[0].id;
     if (booking.resourceId) await load(booking.resourceId);
   });
@@ -46,7 +46,7 @@
       notifier.error("Select resource and dates");
       return;
     }
-    const res = await bookingHandlers.handleBooking(booking);
+    const res = await handleBooking(booking);
     if (res && res.ok) {
       booking = {
         resourceId: booking.resourceId,

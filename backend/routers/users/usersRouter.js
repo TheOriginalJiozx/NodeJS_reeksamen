@@ -36,15 +36,13 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
 
   try {
     const userRow = await db.query(userQueries.selectUserById, [idParameter]);
-    const userData = userRow.rows?.[0];
+    const userData = userRow.rows[0];
     const username = userData?.username;
     const fullname = userData?.fullname;
     if (!username || !fullname) return res.status(404).json({ message: "User not found" });
 
     const conflict = await db.query(bookingQueries.checkActiveBookingsForOwner, [fullname]);
     if (conflict?.rowCount > 0) return res.status(409).json({ message: "Cannot delete account while active bookings exist for your resources" });
-
-    const userHasBookings = await db.query(userQueries.checkUserHasBookings, [username]);
 
     const images = await db.query(userQueries.selectImagesByOwner, [fullname]);
     const resourceImages = (images.rows || []).map((resource) => resource.image).filter(Boolean);
@@ -55,11 +53,7 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
       await db.query(userQueries.deleteAvailabilitiesByOwnerResources, [fullname]);
       await db.query(userQueries.deleteResourcesByOwner, [fullname]);
       await db.query(userQueries.deleteUserById, [idParameter]);
-      
-      if (userHasBookings?.rowCount > 0) {
-        await db.query(userQueries.reserveUsername, [username]);
-      }
-
+      await db.query(userQueries.reserveUsername, [username]);
       await db.query("COMMIT");
     } catch (transactionError) {
       try {
@@ -87,7 +81,7 @@ router.delete(`${API}/users/:id`, isLoggedIn, allowSelfOrAdmin(), async (req, re
     }
 
     try {
-      req.session?.destroy?.();
+      req.session.destroy();
     } catch (error) {
       logger.debug("Failed to destroy session after account deletion", error);
     }

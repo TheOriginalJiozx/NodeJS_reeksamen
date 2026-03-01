@@ -14,7 +14,7 @@ async function fetchUserBookings(userId) {
     }
     return await res.json();
   } catch (error) {
-    logger.error("Error fetching user", error && error.message ? error.message : error);
+    logger.error("Error fetching user", error?.message || error);
     return null;
   }
 }
@@ -35,7 +35,7 @@ async function fetchAllBookings(userFullname) {
     return bookings;
   } catch (error) {
     notifier.error("Failed to load bookings");
-    logger.error("Error fetching bookings", error && error.message ? error.message : error);
+    logger.error("Error fetching bookings", error?.message || error);
     return [];
   }
 }
@@ -55,7 +55,7 @@ async function fetchAllResources() {
     return { resources, resourceMap };
   } catch (error) {
     notifier.error("Failed to load resources");
-    logger.error("Failed to fetch resources", error && error.message ? error.message : error);
+    logger.error("Failed to fetch resources", error?.message || error);
     return { resources: [], resourceMap: {} };
   }
 }

@@ -14,4 +14,4 @@ function remove(id) {
   toasts.update((list) => list.filter((item) => item.id !== id));
 }
 
-export default { toast, remove, toasts };
+export { toast, remove, toasts };

@@ -10,6 +10,8 @@ function extractSessionIdFromCookie(cookieHeader) {
   return raw;
 }
 
+const activeUserSockets = new Map();
+
 async function getSessionByCookieHeader(cookieHeader, sessionStore, logger) {
   try {
     const sessionId = extractSessionIdFromCookie(cookieHeader);
@@ -20,7 +22,7 @@ async function getSessionByCookieHeader(cookieHeader, sessionStore, logger) {
       store.get(sessionId, (error, session) => {
         if (error) {
           if (logger && typeof logger.debug === "function") {
-            logger.debug("Session store get error", error && error.message ? error.message : error);
+            logger.debug("Session store get error", error?.message || error);
           }
           return resolve(null);
         }
@@ -28,7 +30,7 @@ async function getSessionByCookieHeader(cookieHeader, sessionStore, logger) {
       });
     });
   } catch (error) {
-    if (logger && typeof logger.debug === "function") logger.debug("getSessionByCookieHeader error", error && error.message ? error.message : error);
+    if (logger && typeof logger.debug === "function") logger.debug("getSessionByCookieHeader error", error?.message || error);
     return null;
   }
 }
@@ -46,7 +48,7 @@ function initializeSocket(io, sessionStore, logger) {
         try {
           socket.disconnect(true);
         } catch (error) {
-          logger.debug("Socket disconnect error", error && error.message ? error.message : error);
+          logger.debug("Socket disconnect error", error?.message || error);
         }
         return;
       }
@@ -57,11 +59,11 @@ function initializeSocket(io, sessionStore, logger) {
 
     socket.on("joinResource", async (payload) => {
       try {
-        const id = payload && payload.resourceId ? String(payload.resourceId) : null;
+        const id = payload?.resourceId ? String(payload.resourceId) : null;
         if (!id) return;
-        const cookieHeader = socket.handshake && socket.handshake.headers ? socket.handshake.headers.cookie : "";
+        const cookieHeader = socket.handshake?.headers?.cookie ?? "";
         const session = await getSessionByCookieHeader(cookieHeader, sessionStore, logger);
-        const username = session && session.user ? session.user.username : null;
+        const username = session?.user?.username ?? null;
         if (!username) {
           logger.warn(`Unauthorized socket join attempt ${socket.id}`);
           return;
@@ -71,64 +73,89 @@ function initializeSocket(io, sessionStore, logger) {
         socket.data.user = username;
         logger.info(`Socket ${socket.id} (${username}) joined resource:${id}`);
       } catch (error) {
-        logger.warn("joinResource handler error", error && error.message ? error.message : error);
+        logger.warn("joinResource handler error", error?.message || error);
       }
     });
 
     socket.on("joinUser", async (payload) => {
       try {
-        const usernameParameter = payload && payload.username ? String(payload.username) : null;
-        if (!usernameParameter) return;
-        const cookieHeader = socket.handshake && socket.handshake.headers ? socket.handshake.headers.cookie : "";
+        const usernameParameter = payload?.username ? String(payload.username).trim().toLowerCase() : null;
+        if (!usernameParameter) {
+          logger.warn(`[SOCKET] joinUser - empty username parameter`);
+          return;
+        }
+        logger.info(`[SOCKET] joinUser request for: ${usernameParameter} (payload: ${payload.username})`);
+        
+        const cookieHeader = socket.handshake?.headers?.cookie ?? "";
         const session = await getSessionByCookieHeader(cookieHeader, sessionStore, logger);
-        const username = session && session.user ? session.user.username : null;
-        const fullname = session && session.user ? session.user.fullname : null;
+        const username = session?.user?.username ?? null;
+        const fullname = session?.user?.fullname ?? null;
+        
+        logger.debug(`[SOCKET] Session user - username: ${username}, fullname: ${fullname}`);
+        
         if (!username) {
           logger.warn(`Unauthorized socket joinUser attempt ${socket.id}`);
           return;
         }
 
-        if (String(username) !== String(usernameParameter) && String(fullname) !== String(usernameParameter)) {
+        const normalizedUsername = String(username).trim().toLowerCase();
+        const normalizedFullname = fullname ? String(fullname).trim().toLowerCase() : null;
+        
+        logger.debug(`[SOCKET] Checking: normalized=${normalizedUsername}, fullname=${normalizedFullname}, param=${usernameParameter}`);
+        
+        if (normalizedUsername !== usernameParameter && normalizedFullname !== usernameParameter) {
           logger.warn(`Socket ${socket.id} attempted to join user room for different user (${usernameParameter})`);
           return;
         }
+        
+        const previousSocket = activeUserSockets.get(usernameParameter);
+        if (previousSocket && previousSocket.id !== socket.id) {
+          logger.info(`[SOCKET] Disconnecting previous socket ${previousSocket.id} for user ${usernameParameter}`);
+          previousSocket.disconnect(true);
+        }
+        
         socket.join(`user:${usernameParameter}`);
         socket.data = socket.data || {};
         socket.data.user = username;
-        logger.info(`Socket ${socket.id} (${username}) joined user:${usernameParameter}`);
+        
+        activeUserSockets.set(usernameParameter, socket);
+        
+        logger.info(`[SOCKET] Socket ${socket.id} (${username}/${fullname}) joined user:${usernameParameter}`);
       } catch (error) {
-        logger.warn("joinUser handler error", error && error.message ? error.message : error);
+        logger.warn("joinUser handler error", error?.message || error);
       }
     });
 
     socket.on("leaveUser", async (payload) => {
       try {
-        const usernameParam = payload && payload.username ? String(payload.username) : null;
+        const usernameParam = payload?.username ? String(payload.username).trim().toLowerCase() : null;
         if (!usernameParam) return;
-        const cookieHeader = socket.handshake && socket.handshake.headers ? socket.handshake.headers.cookie : "";
+        const cookieHeader = socket.handshake?.headers?.cookie ?? "";
         const session = await getSessionByCookieHeader(cookieHeader, sessionStore, logger);
-        const username = session && session.user ? session.user.username : null;
-        const fullname = session && session.user ? session.user.fullname : null;
+        const username = session?.user?.username ?? null;
+        const fullname = session?.user?.fullname ?? null;
         if (!username) {
           logger.warn(`Unauthorized socket leaveUser attempt ${socket.id}`);
           return;
         }
 
-        if (String(username) !== String(usernameParam) && String(fullname) !== String(usernameParam)) return;
+        const normalizedUsername = String(username).trim().toLowerCase();
+        const normalizedFullname = fullname ? String(fullname).trim().toLowerCase() : null;
+        if (normalizedUsername !== usernameParam && normalizedFullname !== usernameParam) return;
         socket.leave(`user:${usernameParam}`);
         logger.info(`Socket ${socket.id} (${username}) left user:${usernameParam}`);
       } catch (error) {
-        logger.warn("leaveUser handler error", error && error.message ? error.message : error);
+        logger.warn("leaveUser handler error", error?.message || error);
       }
     });
 
     socket.on("leaveResource", async (payload) => {
       try {
-        const id = payload && payload.resourceId ? String(payload.resourceId) : null;
+        const id = payload?.resourceId ? String(payload.resourceId) : null;
         if (!id) return;
-        const cookieHeader = socket.handshake && socket.handshake.headers ? socket.handshake.headers.cookie : "";
+        const cookieHeader = socket.handshake?.headers?.cookie ?? "";
         const session = await getSessionByCookieHeader(cookieHeader, sessionStore, logger);
-        const username = session && session.user ? session.user.username : null;
+        const username = session?.user?.username ?? null;
         if (!username) {
           logger.warn(`Unauthorized socket leave attempt ${socket.id}`);
           return;
@@ -136,14 +163,21 @@ function initializeSocket(io, sessionStore, logger) {
         socket.leave(`resource:${id}`);
         logger.info(`Socket ${socket.id} (${username}) left resource:${id}`);
       } catch (error) {
-        logger.warn("leaveResource handler error", error && error.message ? error.message : error);
+        logger.warn("leaveResource handler error", error?.message || error);
       }
     });
 
     socket.on("disconnect", (reason) => {
+      for (const [key, storedSocket] of activeUserSockets.entries()) {
+        if (storedSocket.id === socket.id) {
+          activeUserSockets.delete(key);
+          logger.info(`[SOCKET] Cleaned up socket ${socket.id} for user ${key}`);
+          break;
+        }
+      }
       logger.info("Socket disconnected", socket.id, reason);
     });
   });
 }
 
-export { extractSessionIdFromCookie, getSessionByCookieHeader, initializeSocket };
+export { initializeSocket };

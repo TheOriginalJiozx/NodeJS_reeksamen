@@ -39,23 +39,6 @@ function groupContinuousDates(dates) {
   return ranges;
 }
 
-function formatRange(range) {
-  if (!range) return "";
-
-  const [startYear, startMonth, startDay] = range.start.split("-").map(Number);
-  const [endYear, endMonth, endDay] = range.end.split("-").map(Number);
-
-  if (startYear === endYear && startMonth === endMonth) {
-    return `${startDay}-${endDay}/${startMonth}`;
-  }
-
-  if (startYear === endYear) {
-    return `${startDay}/${startMonth}-${endDay}/${endMonth}`;
-  }
-
-  return `${startDay}/${startMonth}/${startYear}-${endDay}/${endMonth}/${endYear}`;
-}
-
 function nextYMD(date) {
   const [year, month, day] = date.split("-").map(Number);
   const selectable = new Date(year, month - 1, day);
@@ -64,22 +47,6 @@ function nextYMD(date) {
   const availableMonth = String(selectable.getMonth() + 1).padStart(2, "0");
   const availableDay = String(selectable.getDate()).padStart(2, "0");
   return `${availableYear}-${availableMonth}-${availableDay}`;
-}
-
-function computeAvailableDatesFromAvailabilities(availabilities) {
-  const set = new Set();
-  for (const available of availabilities || []) {
-    if (!available.startDate || !available.endDate) continue;
-    const start = new Date(available.startDate);
-    const end = new Date(available.endDate);
-    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      set.add(`${year}-${month}-${day}`);
-    }
-  }
-  return Array.from(set).sort();
 }
 
 function contiguousEndDates(start, availableDatesList) {
@@ -98,11 +65,18 @@ function contiguousEndDates(start, availableDatesList) {
   return out;
 }
 
-export default {
-  today,
-  groupContinuousDates,
-  formatRange,
-  nextYMD,
-  computeAvailableDatesFromAvailabilities,
-  contiguousEndDates,
-};
+function computeOwnerAvailable(availableDates) {
+  const out = [];
+  for (let i = 0; i < 365; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const fullDate = `${year}-${month}-${day}`;
+    if (!availableDates.includes(fullDate)) out.push(fullDate);
+  }
+  return out;
+}
+
+export { today, groupContinuousDates, contiguousEndDates, computeOwnerAvailable };

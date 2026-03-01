@@ -4,7 +4,11 @@ export default function csrfMiddleware({ exemptPaths = [] } = {}) {
   return function (req, res, next) {
     try {
       if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return next();
-      if (exemptPaths.includes(req.path)) return next();
+      
+      const isExempt = exemptPaths.some(path => 
+        req.path === path || req.path.startsWith(path + "/")
+      );
+      if (isExempt) return next();
 
       const headerToken = req.get("x-csrf-token") || req.get("x-xsrf-token");
       const bodyToken = req.body && req.body.csrfToken;

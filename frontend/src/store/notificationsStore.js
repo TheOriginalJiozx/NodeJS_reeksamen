@@ -1,6 +1,8 @@
 import { writable, derived } from 'svelte/store';
 
 const notifications = writable([]);
+const defectedBookingCount = writable(null);
+const unseenBookingsCount = writable(0);
 
 function pushNotification(notification) {
   notifications.update((array) => {
@@ -21,10 +23,6 @@ function removeNotificationsByBookingId(bookingId) {
   notifications.update((array) => array.filter((notification) => String(notification.bookingId) !== String(bookingId)));
 }
 
-const notificationCount = {
-  subscribe: (run) => notifications.subscribe((array) => run(array.length)),
-};
-
 const resourceBookingNotifications = derived(notifications, (allNotifications) => 
   allNotifications.filter((notification) => notification.type === "booking")
 );
@@ -33,12 +31,16 @@ const myBookingNotifications = derived(notifications, (allNotifications) =>
   allNotifications.filter((notification) => notification.type === "booking:confirmed" || notification.type === "booking:declined")
 );
 
+const defectReportedNotifications = derived(notifications, (allNotifications) => 
+  allNotifications.filter((notification) => notification.type === "defect:reported")
+);
+
 const resourceBookingCount = {
   subscribe: (run) => resourceBookingNotifications.subscribe((array) => run(array.length)),
 };
 
-const myBookingCount = {
-  subscribe: (run) => myBookingNotifications.subscribe((array) => run(array.length)),
+const defectReportedCount = {
+  subscribe: (run) => defectReportedNotifications.subscribe((array) => run(array.length)),
 };
 
-export { notifications, pushNotification, clearNotifications, removeNotificationsByBookingId, notificationCount, resourceBookingNotifications, myBookingNotifications, resourceBookingCount, myBookingCount };
+export { notifications, pushNotification, clearNotifications, removeNotificationsByBookingId, resourceBookingCount, defectReportedCount, defectedBookingCount, unseenBookingsCount };

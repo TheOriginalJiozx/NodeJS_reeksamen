@@ -69,8 +69,19 @@ async function query(sql, values = []) {
   
   while (retries > 0) {
     try {
-      const [rows] = await pool.query(sql, values);
-      return { rows, rowCount: rows.length };
+      const [result] = await pool.query(sql, values);
+      
+      if (Array.isArray(result)) {
+        return { rows: result, rowCount: result.length };
+      }
+      
+      return {
+        rows: result?.rows || [],
+        rowCount: result?.affectedRows || 0,
+        affectedRows: result?.affectedRows || 0,
+        changedRows: result?.changedRows || 0,
+        insertId: result?.insertId,
+      };
     } catch (error) {
       lastError = error;
       retries--;

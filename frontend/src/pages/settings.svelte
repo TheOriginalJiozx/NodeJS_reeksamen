@@ -3,7 +3,8 @@
   import { apiFetch } from "../lib/api.js";
   import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
-  import authUtils from "../utils/authUtils.js";
+  import { loadAuthenticatedUser } from "../lib/auth.js";
+  import { updateUsername, updateFullName, updatePassword } from "../handlers/userHandlers.js";
 
   let loading = true;
   let currentUser = null;
@@ -22,7 +23,7 @@
   onMount(async () => {
     loading = true;
     try {
-      const parsed = authUtils.loadAuthenticatedUser();
+      const parsed = loadAuthenticatedUser();
       if (!parsed || !parsed.id) {
         currentUser = null;
         return;
@@ -35,7 +36,7 @@
       const data = await user.json();
       currentUser = data.user || null;
     } catch (error) {
-      logger.error("Settings load error", error && error.message ? error.message : error);
+      logger.error("Settings load error", error?.message || error);
       currentUser = null;
     } finally {
       loading = false;
@@ -46,18 +47,13 @@
     if (!currentUser || !currentUser.id) return;
     changingUsername = true;
     try {
-      const res = await apiFetch(`/api/users/${currentUser.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newUsername }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return notifier.error(data.message || "Failed to change username");
-      notifier.success(data.message || "Username updated");
-      currentUser.username = newUsername;
-      newUsername = "";
+      const res = await updateUsername(currentUser.id, newUsername);
+      if (res.ok) {
+        currentUser.username = newUsername;
+        newUsername = "";
+      }
     } catch (error) {
-      logger.error("Change username error", error && error.message ? error.message : error);
+      logger.error("Change username error", error?.message || error);
       notifier.error("Network error");
     } finally {
       changingUsername = false;
@@ -68,18 +64,13 @@
     if (!currentUser || !currentUser.id) return;
     changingFullName = true;
     try {
-      const res = await apiFetch(`/api/users/${currentUser.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newFullName: newFullName.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return notifier.error(data.message || "Failed to change full name");
-      notifier.success(data.message || "Full name updated");
-      currentUser.fullName = newFullName;
-      newFullName = "";
+      const res = await updateFullName(currentUser.id, newFullName);
+      if (res.ok) {
+        currentUser.fullname = newFullName;
+        newFullName = "";
+      }
     } catch (error) {
-      logger.error("Change full name error", error && error.message ? error.message : error);
+      logger.error("Change full name error", error?.message || error);
       notifier.error("Network error");
     } finally {
       changingFullName = false;
@@ -91,23 +82,14 @@
     changingPassword = true;
     passwordMessage = "";
     try {
-      const res = await apiFetch(`/api/users/${currentUser.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, newPassword, confirmNewPassword }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        passwordMessage = data.message || "Failed to change password";
-        return;
+      const res = await updatePassword(currentUser.id, currentPassword, newPassword, confirmNewPassword);
+      if (res.ok) {
+        currentPassword = "";
+        newPassword = "";
+        confirmNewPassword = "";
       }
-      passwordMessage = "Password updated";
-      notifier.success(passwordMessage);
-      currentPassword = "";
-      newPassword = "";
-      confirmNewPassword = "";
     } catch (error) {
-      logger.error("Change password error", error && error.message ? error.message : error);
+      logger.error("Change password error", error?.message || error);
       passwordMessage = "Network error";
     } finally {
       changingPassword = false;

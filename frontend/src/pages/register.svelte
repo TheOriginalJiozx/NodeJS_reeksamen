@@ -1,11 +1,11 @@
 <script>
   import { onMount } from "svelte";
   import notifier from "../lib/notifier.js";
-  import { authUser } from "../store/usersStore.js";
+  import { authUser } from "../lib/auth.js";
   import { navigate, route } from "../lib/router.js";
   import logger from "../lib/logger.js";
   import { apiFetch } from "../lib/api.js";
-  import responseUtils from "../utils/responseUtils.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../utils/responseUtils.js";
 
   let name = "";
   let fullName = "";
@@ -30,23 +30,23 @@
         body: JSON.stringify({ username: name, fullname: fullName, email, password, confirmPassword: confirm }),
       });
 
-      const data = await responseUtils.parseResponse(res);
+      const data = await parseResponse(res);
 
       if (!res.ok) {
-        const errMsg = responseUtils.getErrorMessage(data, "Registration failed");
-        notifier.error(errMsg);
+        const errorMessage = getErrorMessage(data, "Registration failed");
+        notifier.error(errorMessage);
         return;
       }
 
-        const successMsg = responseUtils.getSuccessMessage(data, "Account created");
-      notifier.success(successMsg);
+      const successMessage = getSuccessMessage(data, "Account created");
+      notifier.success(successMessage);
       name = "";
       fullName = "";
       email = "";
       password = "";
       confirm = "";
     } catch (error) {
-      const errorMessage = error && error.message ? error.message : "Network error";
+      const errorMessage = error?.message || "Network error";
       notifier.error(errorMessage);
       logger.error("Registration error", errorMessage);
     }

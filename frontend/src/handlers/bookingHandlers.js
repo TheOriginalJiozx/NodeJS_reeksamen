@@ -1,34 +1,22 @@
 import { apiFetch } from "../lib/api.js";
 import notifier from "../lib/notifier.js";
 import logger from "../lib/logger.js";
+import { uploadImages } from "../utils/imageUploadUtils.js";
+import { handleAuthorizationError } from "../lib/authorization.js";
 
 const baseURL = "/api";
 
 async function handleCreate(payload, files) {
-  const filesArray = Array.isArray(files) ? files : files ? [files] : [];
-  let imageUrls = [];
-  if (!filesArray.length) {
-    notifier.error("At least one image is required");
+  const uploadResult = await uploadImages(files);
+  if (!uploadResult.ok) {
+    notifier.error(`Image upload failed: ${uploadResult.error}`);
     return { ok: false };
   }
 
-  for (const file of filesArray) {
-    const formData = new FormData();
-    formData.append("file", file);
-    try {
-      const upload = await apiFetch(`${baseURL}/uploads`, {
-        method: "POST",
-        body: formData,
-      });
-      if (upload.ok) {
-        const uploadData = await upload.json();
-        if (uploadData && uploadData.url) imageUrls.push(uploadData.url);
-      } else {
-        logger.error("Image upload returned non-ok response");
-      }
-    } catch (error) {
-      logger.error("Image upload failed", error && error.message ? error.message : error);
-    }
+  const imageUrls = uploadResult.urls;
+  if (!imageUrls.length) {
+    notifier.error("At least one image is required");
+    return { ok: false };
   }
 
   let finalName = "";
@@ -47,12 +35,28 @@ async function handleCreate(payload, files) {
     finalName = create.name;
   }
 
-  const imageUrl = imageUrls.length ? imageUrls.join(";") : null;
+  const imageUrl = imageUrls.join(";");
+  
+  let body = { ...create, imageUrl };
+  if (isCarCreate) {
+    body.brand = createBrand;
+    body.model = createModel;
+    body.year = createYear;
+  } else {
+    body.name = finalName;
+  }
+  
   const res = await apiFetch(`${baseURL}/resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...create, name: finalName, imageUrl }),
+    body: JSON.stringify(body),
   });
+
+  const authError = handleAuthorizationError(res);
+  if (authError) {
+    notifier.error(authError.message);
+    return { ok: false, data: authError };
+  }
 
   let data = {};
   const content = res.headers.get("content-type");
@@ -80,6 +84,12 @@ async function handleAddAvailability(available) {
     body: JSON.stringify(available),
   });
 
+  const authError = handleAuthorizationError(res);
+  if (authError) {
+    notifier.error(authError.message);
+    return { ok: false, data: authError };
+  }
+
   let data = {};
   const content = res.headers.get("content-type");
   if (content.includes("application/json")) data = await res.json();
@@ -101,6 +111,12 @@ async function handleBooking(booking) {
     body: JSON.stringify(booking),
   });
 
+  const authError = handleAuthorizationError(response);
+  if (authError) {
+    notifier.error(authError.message);
+    return { ok: false, data: authError };
+  }
+
   let data = {};
   const content = response.headers.get("content-type");
   if (content.includes("application/json")) data = await response.json();
@@ -115,8 +131,40 @@ async function handleBooking(booking) {
   return { ok: true, data };
 }
 
-export default {
-  handleCreate,
-  handleAddAvailability,
-  handleBooking,
-};
+async function reportDefect(bookingId, defectReport, defectImages) {
+  logger.info(`[reportDefect] Starting with bookingId=${bookingId}`);
+  
+  const uploadResult = await uploadImages(defectImages);
+  if (!uploadResult.ok) {
+    notifier.error(`Image upload failed: ${uploadResult.error}`);
+    return { ok: false };
+  }
+
+  const defectImageUrl = uploadResult.urls.length > 0 ? uploadResult.urls.join(";") : null;
+  
+  const response = await apiFetch(`${baseURL}/bookings/${bookingId}/defect`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ defectReport, defectImage: defectImageUrl }),
+  });
+
+  const authError = handleAuthorizationError(response);
+  if (authError) {
+    notifier.error(authError.message);
+    return { ok: false };
+  }
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    logger.error(`[reportDefect] Failed: ${data.message}`);
+    notifier.error(data.message || "Failed to report defect");
+    return { ok: false };
+  }
+
+  notifier.success(data.message || "Defect reported successfully");
+  logger.info(`[reportDefect] Success!`);
+  return { ok: true };
+}
+
+export { handleCreate, handleAddAvailability, handleBooking, reportDefect };

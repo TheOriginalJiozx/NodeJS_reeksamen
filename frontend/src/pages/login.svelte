@@ -1,12 +1,11 @@
 <script>
   import { onMount } from "svelte";
-  import { authUser } from "../store/usersStore.js";
+  import { setUserSessionAuth, authUser } from "../lib/auth.js";
   import { navigate, route } from "../lib/router.js";
   import notifier from "../lib/notifier.js";
   import logger from "../lib/logger.js";
   import { apiFetch } from "../lib/api.js";
-  import { setAuth } from "../lib/authentication.js";
-  import responseUtils from "../utils/responseUtils.js";
+  import { parseResponse, getErrorMessage, getSuccessMessage } from "../utils/responseUtils.js";
 
   let username = "";
   let password = "";
@@ -28,23 +27,23 @@
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await responseUtils.parseResponse(res);
+      const data = await parseResponse(res);
 
       if (!res.ok) {
-        const errorMessage = responseUtils.getErrorMessage(data, "Login failed");
+        const errorMessage = getErrorMessage(data, "Login failed");
         notifier.error(errorMessage);
         return;
       }
 
-      const successMsg = responseUtils.getSuccessMessage(data, "Login successful");
-      notifier.success(successMsg);
-      if (data.user) setAuth(data.user);
+      const successMessage = getSuccessMessage(data, "Login successful");
+      notifier.success(successMessage);
+      if (data.user) setUserSessionAuth(data.user);
       username = "";
       password = "";
       navigate("/profile");
       route.set("/profile");
     } catch (error) {
-      const errorMessage = error && error.message ? error.message : "Network error";
+      const errorMessage = error?.message || "Network error";
       notifier.error(errorMessage);
       logger.error("Login error", errorMessage);
     }

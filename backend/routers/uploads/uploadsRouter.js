@@ -1,93 +1,25 @@
 import { Router } from "express";
-import multer from "multer";
-import path from "path";
 import fs from "fs";
+import path from "path";
 import logger from "../../lib/logger.js";
 import { isLoggedIn } from "../../middleware/authMiddleware.js";
-import { spawn } from "child_process";
+import { upload, uploadDirectory } from "../../middleware/uploadMiddleware.js";
+import { checkUploadLimit } from "../../utils/uploadLimitUtils.js";
+import { scanFileForViruses } from "../../utils/virusScanUtils.js";
 
 const router = Router();
 const API = "/api";
 
-const uploadDirectory = path.resolve("./../frontend/public/uploads");
-try {
-  fs.mkdirSync(uploadDirectory, {
-    recursive: true,
-  });
-} catch (error) {
-  logger.error(error, "Could not create upload directory");
-}
-
-const storage = multer.diskStorage({
-  destination: function (_req, _file, callback) {
-    callback(null, uploadDirectory);
-  },
-  filename: function (_req, file, callback) {
-    const extension = path.extname(file.originalname);
-    const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extension}`;
-    callback(null, name);
-  },
-});
-
-const allowedMimes = new Set(["image/png", "image/jpeg"]);
-function fileFilter(_req, file, callback) {
-  if (allowedMimes.has(file.mimetype)) return callback(null, true);
-  const error = new Error("Invalid file type");
-  error.code = "INVALID_FILE_TYPE";
-  return callback(error, false);
-}
-
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
-
-async function scanFileForViruses(filePath) {
-  return new Promise((resolve) => {
-    try {
-      const clamscan = spawn("clamscan", ["--quiet", filePath]);
-      let output = "";
-      let error = "";
-
-      clamscan.stdout.on("data", (data) => {
-        output += data.toString();
-      });
-
-      clamscan.stderr.on("data", (data) => {
-        error += data.toString();
-      });
-
-      clamscan.on("error", (error) => {
-        logger.warn("ClamAV not found - skipping virus scan (install ClamAV for production):", error.message);
-        resolve({ clean: true, message: "ClamAV unavailable, file accepted" });
-      });
-
-      clamscan.on("close", (code) => {
-        if (code === 0) {
-          resolve({ clean: true, message: "File is clean" });
-        } else if (code === 1) {
-          logger.warn(`Virus detected in file: ${filePath}`, { output });
-          resolve({ clean: false, message: "Virus detected in file" });
-        } else {
-          logger.warn("ClamAV not available, allowing file (install ClamAV for production)", {
-            error,
-          });
-          resolve({ clean: true, message: "ClamAV unavailable, file accepted" });
-        }
-      });
-    } catch (error) {
-      logger.warn("Could not run ClamAV, allowing file:", error.message);
-      resolve({ clean: true, message: "ClamAV unavailable, file accepted" });
-    }
-  });
-}
-
 router.post(`${API}/uploads`, isLoggedIn, (req, res) => {
+  const userId = req.user?.id;
+  if (!userId || !checkUploadLimit(userId)) {
+    return res.status(429).json({ message: "Upload limit exceeded. Max 10 uploads per hour" });
+  }
+
   upload.single("file")(req, res, async (error) => {
     if (error) {
       if (error.code === "LIMIT_FILE_SIZE")
-        return res.status(400).json({ message: "File too large (max 5MB)" });
+        return res.status(400).json({ message: "File too large (max 25MB)" });
       if (error.code === "INVALID_FILE_TYPE")
         return res.status(400).json({ message: "Invalid file type. Only PNG and JPEG allowed" });
       logger.error(error, "POST /api/uploads multer error");

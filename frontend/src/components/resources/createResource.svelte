@@ -1,13 +1,13 @@
 <script>
   import { onMount } from "svelte";
-  import bookingFetchers from "../../fetchers/bookingFetchers.js";
+  import { fetchTypes, fetchAllResources } from "../../fetchers/bookingFetchers.js";
   import { apiFetch } from "../../lib/api.js";
   import notifier from "../../lib/notifier.js";
   import CarFields from "./carFields.svelte";
-  import ImageUploader from "./imageUploader.svelte";
-  import bookingHandlers from "../../handlers/bookingHandlers.js";
+  import ImageUploader from "./imagesUploader.svelte";
+  import { handleCreate } from "../../handlers/bookingHandlers.js";
   import logger from "../../lib/logger.js";
-  import authUtils from "../../utils/authUtils.js";
+  import { getCachedUser } from "../../lib/auth.js";
 
   let types = [];
   let create = { name: "", type: "" };
@@ -24,31 +24,31 @@
   let submitting = false;
 
   const startYear = 1990;
-  $: years = Array.from({ length: new Date().getFullYear() - startYear + 1 }, (_, index) => startYear + index);
+  $: years = Array.from({ length: new Date().getFullYear() - startYear + 1 }, (_element, index) => startYear + index);
 
   onMount(async () => {
     try {
-      types = await bookingFetchers.fetchTypes();
+      types = await fetchTypes();
       try {
-        const all = await bookingFetchers.fetchAllResources();
+        const all = await fetchAllResources();
         resourcesAll = all.resourcesAll || [];
       } catch (error) {
-        logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
+        logger.error("Failed to fetch all resources", error?.message || error);
       }
       try {
-        const cached = authUtils.getCachedUser();
+        const cached = getCachedUser();
         const userId = cached?.id;
         if (userId) {
-          const r = await apiFetch(`/api/users/${userId}/resources`);
-          if (r.ok) resourcesOwned = await r.json();
+          const resource = await apiFetch(`/api/users/${userId}/resources`);
+          if (resource.ok) resourcesOwned = await resource.json();
           else notifier.error("Failed to fetch your resources");
         }
       } catch (error) {
         notifier.error("Failed to fetch your resources");
-        logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
+        logger.error("Failed to fetch owned resources", error?.message || error);
       }
     } catch (error) {
-      logger.error("Failed to fetch resource types", error && error.message ? error.message : error);
+      logger.error("Failed to fetch resource types", error?.message || error);
     }
   });
 
@@ -69,7 +69,7 @@
         finalModel = createModel;
       }
 
-      const res = await bookingHandlers.handleCreate({ create, isCarCreate, createBrand: finalBrand, createModel: finalModel, createYear }, createImageFiles);
+      const res = await handleCreate({ create, isCarCreate, createBrand: finalBrand, createModel: finalModel, createYear }, createImageFiles);
 
       if (res && res.ok) {
         create = { name: "", type: "" };
@@ -78,16 +78,16 @@
         try {
           if (createImageInput) createImageInput.value = null;
         } catch (error) {
-          logger.error("Failed to reset file input", error && error.message ? error.message : error);
+          logger.error("Failed to reset file input", error?.message || error);
         }
         try {
-          const all = await bookingFetchers.fetchAllResources();
+          const all = await fetchAllResources();
           resourcesAll = all.resourcesAll || [];
         } catch (error) {
-          logger.error("Failed to fetch all resources", error && error.message ? error.message : error);
+          logger.error("Failed to fetch all resources", error?.message || error);
         }
         try {
-          const cached = authUtils.getCachedUser();
+          const cached = getCachedUser();
           const userId = cached?.id;
           if (userId) {
             const resources = await apiFetch(`/api/users/${userId}/resources`);
@@ -96,7 +96,7 @@
           }
         } catch (error) {
           notifier.error("Failed to fetch your resources");
-          logger.error("Failed to fetch owned resources", error && error.message ? error.message : error);
+          logger.error("Failed to fetch owned resources", error?.message || error);
         }
       }
     } finally {

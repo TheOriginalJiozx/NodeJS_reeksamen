@@ -2,7 +2,7 @@ import { mount } from "svelte";
 import App from "./App.svelte";
 import "./styles.css";
 import logger from "./lib/logger";
-import "./utils/authGuardUtils.js";
+import "./lib/authGuard.js";
 
 try {
   if (typeof Node !== "undefined") {
@@ -17,9 +17,9 @@ try {
     }
   }
 } catch (error) {
-  logger.error(
+    logger.error(
     "Could not polyfill Node.firstChild",
-    error && error.message ? error.message : error,
+    error?.message || error,
   );
 }
 

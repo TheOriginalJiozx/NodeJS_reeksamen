@@ -14,7 +14,7 @@ function emitBookingCreatedEvents(io, resourceId, startDate, endDate, bookingId,
       });
     }
   } catch (error) {
-    logger.warn("Failed to emit booking:created", error && error.message ? error.message : error);
+    logger.warn("Failed to emit booking:created", error?.message || error);
   }
 
   db.query(resourceQueries.selectResourceById, [resourceId])
@@ -24,7 +24,9 @@ function emitBookingCreatedEvents(io, resourceId, startDate, endDate, bookingId,
         .then((ownerRes) => {
           const owner = ownerRes.rowCount && ownerRes.rows[0] ? ownerRes.rows[0].owner : null;
           if (owner && io) {
-            io.to(`user:${owner}`).emit("booking:created", {
+            const normalizedOwner = String(owner).trim().toLowerCase();
+            logger.debug(`Emitting booking:created to user:${normalizedOwner} (owner: ${owner})`);
+            io.to(`user:${normalizedOwner}`).emit("booking:created", {
               resourceId,
               resourceName,
               startDate,
@@ -35,11 +37,11 @@ function emitBookingCreatedEvents(io, resourceId, startDate, endDate, bookingId,
           }
         })
         .catch((error) => {
-          logger.debug("Failed to emit booking:created to user room", error && error.message ? error.message : error);
+          logger.debug("Failed to emit booking:created to user room", error?.message || error);
         });
     })
     .catch((error) => {
-      logger.debug("Failed to fetch resource for booking:created event", error && error.message ? error.message : error);
+      logger.debug("Failed to fetch resource for booking:created event", error?.message || error);
     });
 }
 
